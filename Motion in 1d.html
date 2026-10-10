@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kinematics Master Visualizer</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg-dark: #000000;
+      --card-bg: rgba(18, 18, 22, 0.75);
+      --border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg-dark);
+      color: #ffffff;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow-x: hidden;
+    }
+    .font-mono-num {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Common Glow Effects */
+    .glow-dot { box-shadow: 0 0 12px rgba(255, 255, 255, 0.9), 0 0 24px rgba(255, 255, 255, 0.4); }
+    .glow-arrow { filter: drop-shadow(0px 2px 8px rgba(255, 255, 255, 0.7)); }
+    .glow-pos-arrow { filter: drop-shadow(0px 0px 6px rgba(255, 255, 255, 0.8)); }
+    .glow-vel-arrow, .glow-vel { filter: drop-shadow(0px 0px 8px rgba(56, 189, 248, 0.8)); }
+    .glow-acc { filter: drop-shadow(0px 0px 8px rgba(232, 121, 249, 0.8)); }
+    .glow-tangent { text-shadow: 0 0 8px rgba(250, 204, 21, 0.8); }
+
+    /* Custom range input styling */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: #262626;
+      height: 6px;
+      border-radius: 9999px;
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
+      transition: transform 0.1s ease, background 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+      background: #38bdf8;
+    }
+
+    /* Canvas Container Rules for Part 3 */
+    .canvas-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      backdrop-filter: blur(12px);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0a0a0c; }
+    ::-webkit-scrollbar-thumb { background: #26262e; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
+  </style>
+</head>
+<body class="bg-black text-white min-h-screen flex flex-col items-center p-6 sm:p-12">
+
+  <div class="w-full max-w-6xl mt-4 mb-8 text-neutral-300">
+    <h1 class="text-4xl font-bold text-white mb-6 text-center tracking-tight">Kinematics Foundations</h1>
+    <h2 class="text-2xl font-bold text-white mb-2 border-b border-neutral-800 pb-2">1. Distance</h2>
+    <p class="mb-1 leading-relaxed">Distance is a scalar quantity that represents the total path length traveled by an object, regardless of its direction.</p>
+    <p class="leading-relaxed">It gives us an idea of how far an object has moved from a reference point and is strictly a non-negative value.</p>
+  </div>
+
+  <section class="w-full max-w-5xl flex flex-col items-center mb-24">
+    <!-- Top Navigation Header -->
+    <header class="w-full flex justify-between items-center z-10 mb-6">
+      <div class="flex items-center gap-3">
+        <div class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></div>
+        <h1 class="text-xs uppercase tracking-widest text-neutral-400 font-semibold">Origin Physics Visualizer</h1>
+      </div>
+      <!-- Quick Scale Switcher -->
+      <div class="flex items-center gap-2 bg-neutral-950 border border-neutral-800 rounded-full p-1 text-xs">
+        <span class="text-neutral-500 px-2 font-mono">SCALE:</span>
+        <button id="d1_scale100" class="px-3 py-1 rounded-full bg-white text-black font-semibold transition-all">±100</button>
+        <button id="d1_scale500" class="px-3 py-1 rounded-full hover:bg-neutral-800 text-neutral-400 transition-all">±500</button>
+        <button id="d1_scale1" class="px-3 py-1 rounded-full hover:bg-neutral-800 text-neutral-400 transition-all">±1.00</button>
+      </div>
+    </header>
+
+    <!-- Primary Layout Container -->
+    <div class="w-full bg-neutral-950/60 border border-neutral-900 rounded-2xl p-6 sm:p-12 backdrop-blur-md shadow-2xl flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+      <!-- Left Area: Slider System with Arrow -->
+      <div class="flex-1 w-full flex flex-col items-center justify-center relative py-12">
+        <div id="d1_sliderTrack" class="relative w-full h-12 flex items-center cursor-pointer group select-none">
+          <div class="w-full h-[2px] bg-white/90 relative rounded-full"></div>
+          <div id="d1_vectorLine" class="absolute top-1/2 -translate-y-1/2 h-[3px] bg-white/80 pointer-events-none z-10 transition-all"></div>
+          <div id="d1_vectorArrowHead" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20 transition-all">
+            <svg id="d1_vectorArrowSvg" class="w-9 h-9 text-white glow-arrow transform" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/>
+            </svg>
+          </div>
+          <div class="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-6 bg-white rounded-full"></div>
+          <span id="d1_leftBoundLabel" class="absolute left-0 -bottom-7 -translate-x-1/2 text-xs font-mono text-neutral-500">-100</span>
+          <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-4 bg-neutral-400"></div>
+          <span class="absolute left-1/2 -bottom-7 -translate-x-1/2 text-xs font-mono text-neutral-400 font-medium">0</span>
+          <div class="absolute right-0 top-1/2 -translate-y-1/2 w-[2px] h-6 bg-white rounded-full"></div>
+          <span id="d1_rightBoundLabel" class="absolute right-0 -bottom-7 translate-x-1/2 text-xs font-mono text-neutral-500">+100</span>
+          <div id="d1_sliderDot" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white glow-dot cursor-grab active:cursor-grabbing transition-transform group-hover:scale-125 z-30"></div>
+        </div>
+        <p class="text-xs text-neutral-600 mt-10 tracking-wide flex items-center gap-2">
+          <span>Click track or drag dot</span><span class="text-neutral-700">•</span>
+          <span>Use <kbd class="px-1.5 py-0.5 bg-neutral-900 border border-neutral-800 rounded text-[10px]">←</kbd> <kbd class="px-1.5 py-0.5 bg-neutral-900 border border-neutral-800 rounded text-[10px]">→</kbd> keys</span>
+        </p>
+      </div>
+
+      <!-- Right Side Panel -->
+      <div class="w-full lg:w-72 bg-neutral-900/40 border border-neutral-800/80 rounded-xl p-6 flex flex-col justify-between shrink-0">
+        <div class="flex items-center justify-between border-b border-neutral-800/80 pb-3 mb-4">
+          <span class="text-xs uppercase tracking-widest text-neutral-400 font-medium">Distance</span>
+          <span class="text-[10px] bg-neutral-800 text-neutral-300 font-mono px-2 py-0.5 rounded">FROM ORIGIN</span>
+        </div>
+        <div class="my-2">
+          <div class="flex items-baseline gap-1">
+            <span id="d1_distanceDisplay" class="text-5xl font-bold font-mono-num tracking-tight text-white">0.00</span>
+            <span id="d1_unitDisplay" class="text-neutral-500 font-mono text-sm">units</span>
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <span id="d1_directionBadge" class="text-[11px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-300">AT ORIGIN</span>
+            <span id="d1_offsetSignedDisplay" class="text-xs font-mono text-neutral-500">Offset: 0.00</span>
+          </div>
+        </div>
+        <div class="mt-6 pt-4 border-t border-neutral-800/80 flex items-center gap-2">
+          <button id="d1_resetBtn" class="flex-1 py-2 px-3 bg-white hover:bg-neutral-200 text-black rounded-lg text-xs font-semibold tracking-wide transition-colors flex items-center justify-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 00-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            Zero Center
+          </button>
+          <button id="d1_invertBtn" class="py-2 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs font-mono transition-colors">± Flip</button>
+        </div>
+      </div>
+    </div>
+    <footer class="w-full mt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-neutral-600 z-10">
+      <div class="flex items-center gap-4">
+        <span>Boundary Left: <strong id="d1_statusMin" class="text-neutral-400 font-mono">-100</strong></span>
+        <span>Boundary Right: <strong id="d1_statusMax" class="text-neutral-400 font-mono">+100</strong></span>
+      </div>
+      <div class="font-mono text-[11px] text-neutral-500">System Axis: X[-1.0, +1.0]</div>
+    </footer>
+  </section>
+
+  <div class="w-full max-w-6xl mb-8 text-neutral-300">
+    <h2 class="text-2xl font-bold text-white mb-2 border-b border-neutral-800 pb-2">2. Velocity</h2>
+    <p class="mb-1 leading-relaxed">Velocity is a vector quantity that defines the rate at which an object changes its position over time, encompassing both speed and direction.</p>
+    <p class="leading-relaxed">The standard formula for average velocity is <strong class="text-cyan-300">v = Δx / Δt</strong>, where Δx is the displacement and Δt is the change in time.</p>
+  </div>
+
+  <section class="w-full max-w-6xl flex flex-col items-center mb-24">
+    <header class="w-full flex justify-between items-center z-10 mb-4">
+      <div class="flex items-center gap-3">
+        <div class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></div>
+        <h1 class="text-xs uppercase tracking-widest text-neutral-400 font-semibold">1D Kinematics & Velocity Vector Engine</h1>
+      </div>
+      <div class="hidden sm:flex items-center gap-4 bg-neutral-950 border border-neutral-800 rounded-full px-4 py-1 text-xs font-mono">
+        <div class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-white rounded-full"></span><span class="text-neutral-400">Position Vector</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-cyan-400 rounded-full"></span><span class="text-neutral-400">Velocity Vector</span></div>
+      </div>
+    </header>
+
+    <div class="w-full bg-neutral-950/70 border border-neutral-900 rounded-2xl p-6 sm:p-10 backdrop-blur-md shadow-2xl flex flex-col lg:flex-row items-stretch gap-8">
+      <!-- Interactive Physics Track -->
+      <div class="flex-1 flex flex-col justify-between items-center relative py-8 bg-neutral-900/30 border border-neutral-900 rounded-xl p-6">
+        <div class="w-full flex justify-between items-center text-xs font-mono text-neutral-500 mb-8">
+          <span>LEFT BOUND (-100m)</span><span class="text-white font-medium">ORIGIN (0m)</span><span>RIGHT BOUND (+100m)</span>
+        </div>
+        <div id="d2_sliderTrack" class="relative w-full h-20 flex items-center cursor-pointer group select-none my-auto">
+          <div class="w-full h-[2px] bg-white/80 relative rounded-full"></div>
+          <div id="d2_posVectorLine" class="absolute top-1/2 -translate-y-1/2 h-[2px] bg-white pointer-events-none z-10"></div>
+          <div id="d2_posArrowHead" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-20">
+            <svg id="d2_posArrowSvg" class="w-7 h-7 text-white glow-pos-arrow transform" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/>
+            </svg>
+          </div>
+          <div id="d2_velVectorLine" class="absolute top-1/2 -translate-y-1/2 h-[3px] bg-cyan-400 pointer-events-none z-20"></div>
+          <div id="d2_velArrowHead" class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-30">
+            <svg id="d2_velArrowSvg" class="w-8 h-8 text-cyan-400 glow-vel-arrow transform" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/>
+            </svg>
+          </div>
+          <div class="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-8 bg-white rounded-full"></div>
+          <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[1px] h-5 bg-neutral-400"></div>
+          <div class="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-8 bg-white rounded-full"></div>
+          <div id="d2_sliderDot" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white glow-dot cursor-grab active:cursor-grabbing transition-transform group-hover:scale-110 z-40"></div>
+        </div>
+        <div class="w-full flex items-center justify-between gap-3 mt-8">
+          <div class="flex items-center gap-2">
+            <button id="d2_playPauseBtn" class="py-2 px-4 bg-white hover:bg-neutral-200 text-black rounded-lg text-xs font-semibold transition-all flex items-center gap-2">
+              <svg id="d2_playIcon" class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+              <svg id="d2_pauseIcon" class="w-3.5 h-3.5 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+              <span id="d2_playPauseText">Play Motion</span>
+            </button>
+            <button id="d2_resetBtn" class="py-2 px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-xs font-mono transition-colors">Reset</button>
+          </div>
+          <div class="flex items-center gap-2 bg-neutral-900 p-1 rounded-lg border border-neutral-800 text-xs">
+            <span class="text-neutral-500 px-1 font-mono text-[11px]">BOUNDS:</span>
+            <button id="d2_bounceModeBtn" class="px-2.5 py-1 rounded-md bg-neutral-800 text-white font-mono text-[11px]">Bounce</button>
+            <button id="d2_stopModeBtn" class="px-2.5 py-1 rounded-md text-neutral-400 hover:text-white font-mono text-[11px]">Stop</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Distance & Velocity Dashboard -->
+      <div class="w-full lg:w-80 flex flex-col justify-between gap-6 shrink-0">
+        <div class="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-neutral-800 pb-2">
+            <span class="text-xs uppercase tracking-widest text-neutral-400 font-semibold">Live Telemetry</span>
+            <span id="d2_statusBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-400">PAUSED</span>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <span class="text-[10px] font-mono text-neutral-500 uppercase">Distance (|x|)</span>
+              <div class="flex items-baseline gap-1 mt-0.5">
+                <span id="d2_distanceDisplay" class="text-2xl font-bold font-mono-num text-white">0.0</span><span class="text-xs text-neutral-500 font-mono">m</span>
+              </div>
+            </div>
+            <div>
+              <span class="text-[10px] font-mono text-neutral-500 uppercase">Position (x)</span>
+              <div class="flex items-baseline gap-1 mt-0.5">
+                <span id="d2_positionDisplay" class="text-2xl font-bold font-mono-num text-white">0.0</span><span class="text-xs text-neutral-500 font-mono">m</span>
+              </div>
+            </div>
+          </div>
+          <div class="pt-2 border-t border-neutral-800/60">
+            <span class="text-[10px] font-mono text-neutral-500 uppercase">Velocity (v)</span>
+            <div class="flex items-baseline gap-1.5 mt-0.5">
+              <span id="d2_velocityDisplay" class="text-3xl font-bold font-mono-num text-cyan-400">0.0</span><span class="text-xs text-neutral-500 font-mono">m/s</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-neutral-900/50 border border-neutral-800 rounded-xl p-5 space-y-5">
+          <span class="text-xs uppercase tracking-widest text-neutral-400 font-semibold block">Controls</span>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-xs font-mono">
+              <label class="text-neutral-400">Distance / Position</label><span id="d2_posRangeVal" class="text-white">0m</span>
+            </div>
+            <input type="range" id="d2_posRange" min="-100" max="100" value="0" step="1" class="w-full">
+            <div class="flex justify-between text-[10px] font-mono text-neutral-600"><span>-100m</span><span>0m</span><span>+100m</span></div>
+          </div>
+          <div class="space-y-2">
+            <div class="flex justify-between items-center text-xs font-mono">
+              <label class="text-cyan-400">Velocity Vector</label><span id="d2_velRangeVal" class="text-cyan-400">0 m/s</span>
+            </div>
+            <input type="range" id="d2_velRange" min="-50" max="50" value="0" step="1" class="w-full">
+            <div class="flex justify-between text-[10px] font-mono text-neutral-600"><span>-50 m/s</span><span>0</span><span>+50 m/s</span></div>
+          </div>
+          <div class="grid grid-cols-2 gap-2 pt-2">
+            <button id="d2_zeroVelBtn" class="py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-xs font-mono transition-colors">v = 0 m/s</button>
+            <button id="d2_reverseVelBtn" class="py-1.5 px-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-xs font-mono transition-colors">Reverse v</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <footer class="w-full mt-4 flex justify-between items-center gap-2 text-xs text-neutral-600 z-10">
+      <div><span>Equation: </span><code class="font-mono text-neutral-400">x(t) = x₀ + v · t</code></div>
+      <div class="font-mono text-[11px] text-neutral-500">Drag dot or use sliders to set initial conditions</div>
+    </footer>
+  </section>
+
+  <div class="w-full max-w-7xl mb-8 text-neutral-300">
+    <h2 class="text-2xl font-bold text-white mb-2 border-b border-neutral-800 pb-2">3. Acceleration & Graphs</h2>
+    <p class="mb-1 leading-relaxed">Acceleration describes the rate of change of velocity over time. It indicates whether an object is speeding up, slowing down, or changing direction.</p>
+    <p class="leading-relaxed">It is a vector quantity calculated using the formula <strong class="text-fuchsia-400">a = Δv / Δt</strong>. The interactive below demonstrates how position, velocity, and acceleration are intricately linked dynamically.</p>
+  </div>
+
+  <section class="w-full max-w-7xl flex flex-col items-center mb-16">
+    <header class="w-full flex flex-col md:flex-row justify-between items-center gap-4 mb-5">
+      <div class="flex items-center gap-3">
+        <div class="w-3 h-3 rounded-full bg-yellow-400 animate-pulse shadow-[0_0_12px_rgba(250,204,21,0.9)]"></div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-wider uppercase bg-gradient-to-r from-white via-neutral-200 to-neutral-400 bg-clip-text text-transparent">Kinematics & Graph Engine 3.0</h1>
+          <p class="text-[11px] text-neutral-400 font-mono mt-0.5">Dynamic 1D Physics • Real-time Derivatives • Strict Clipping Boundaries</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 bg-neutral-900/90 border border-neutral-800 rounded-full px-4 py-1.5 text-[11px] font-mono shadow-md">
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-white inline-block"></span> Position <span class="text-neutral-500">(x)</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block"></span> Velocity <span class="text-neutral-500">(v)</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-fuchsia-400 inline-block"></span> Accel <span class="text-neutral-500">(a)</span></div>
+        <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block"></span> Tangent</div>
+      </div>
+    </header>
+
+    <div class="w-full flex flex-col lg:flex-row gap-5">
+      <!-- LEFT COLUMN -->
+      <div class="w-full lg:w-5/12 flex flex-col gap-4">
+        <div class="canvas-card rounded-2xl p-5 relative flex flex-col justify-between overflow-hidden">
+          <div class="flex justify-between items-center text-[11px] font-mono text-neutral-400 mb-6">
+            <span class="bg-neutral-800/80 px-2 py-0.5 rounded border border-neutral-700/50">-100 m</span>
+            <span class="text-white font-bold bg-neutral-800/90 px-2 py-0.5 rounded border border-neutral-600">ORIGIN (0)</span>
+            <span class="bg-neutral-800/80 px-2 py-0.5 rounded border border-neutral-700/50">+100 m</span>
+          </div>
+          <div id="d3_trackContainer" class="relative w-full h-20 flex items-center cursor-ew-resize select-none">
+            <div class="w-full h-[2px] bg-neutral-700 relative rounded-full">
+              <div class="absolute left-0 top-1/2 -translate-y-1/2 w-[1px] h-3 bg-neutral-500"></div>
+              <div class="absolute left-1/4 top-1/2 -translate-y-1/2 w-[1px] h-2 bg-neutral-600"></div>
+              <div class="absolute left-1/2 top-1/2 -translate-y-1/2 w-[2px] h-6 bg-white/70"></div>
+              <div class="absolute left-3/4 top-1/2 -translate-y-1/2 w-[1px] h-2 bg-neutral-600"></div>
+              <div class="absolute left-full top-1/2 -translate-y-1/2 w-[1px] h-3 bg-neutral-500"></div>
+            </div>
+            <div id="d3_posDot" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white glow-dot z-30 transition-transform hover:scale-125"></div>
+            <div id="d3_velLine" class="absolute top-1/2 -translate-y-1/2 h-[3px] bg-cyan-400 z-20 pointer-events-none origin-left rounded-full shadow-[0_0_8px_rgba(34,211,238,0.8)]"></div>
+            <div id="d3_velHead" class="absolute top-1/2 -translate-y-1/2 z-20 pointer-events-none -ml-2 -mt-2">
+              <svg class="w-5 h-5 text-cyan-400 glow-vel" fill="currentColor" viewBox="0 0 20 20"><path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/></svg>
+            </div>
+            <div id="d3_accLine" class="absolute top-1/2 -translate-y-1/2 h-[3px] bg-fuchsia-400 z-10 pointer-events-none origin-left rounded-full shadow-[0_0_8px_rgba(232,121,249,0.8)]"></div>
+            <div id="d3_accHead" class="absolute top-1/2 -translate-y-1/2 z-10 pointer-events-none -ml-2 mt-1">
+              <svg class="w-5 h-5 text-fuchsia-400 glow-acc" fill="currentColor" viewBox="0 0 20 20"><path d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z"/></svg>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-neutral-800/80 flex justify-between items-center text-xs font-mono">
+            <div class="text-neutral-400">Distance from Origin:</div>
+            <div class="text-white font-bold bg-neutral-900 border border-neutral-800 px-3 py-1 rounded-lg">|<span id="d3_lblDist">0.0</span>m|</div>
+          </div>
+        </div>
+
+        <div class="canvas-card rounded-2xl p-5 flex flex-col gap-5">
+          <div class="flex justify-between items-center border-b border-neutral-800/80 pb-4">
+            <div class="flex items-center gap-2">
+              <button id="d3_btnPlay" class="bg-white text-black font-bold px-4 py-2 rounded-lg text-xs hover:bg-neutral-200 active:scale-95 transition-all shadow-md w-20">PLAY</button>
+              <button id="d3_btnStep" class="bg-neutral-800 hover:bg-neutral-700 text-neutral-200 px-3 py-2 rounded-lg text-xs font-mono active:scale-95 transition-all border border-neutral-700">+0.05s</button>
+              <button id="d3_btnReset" class="bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-2 rounded-lg text-xs font-mono active:scale-95 transition-all border border-neutral-700">RESET</button>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] text-neutral-500 font-mono">ELAPSED TIME</div>
+              <div class="text-base font-mono font-bold text-yellow-400"><span id="d3_lblTime">0.00</span>s</div>
+            </div>
+          </div>
+          <div>
+            <label class="text-[11px] font-mono text-neutral-400 uppercase tracking-wider block mb-2">Preset Motion Profiles:</label>
+            <div class="grid grid-cols-2 gap-2 text-xs font-mono">
+              <button data-preset="shm" class="d3_btn-preset bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 py-1.5 px-2 rounded-lg text-left text-neutral-300 transition-colors">1. Harmonic Motion</button>
+              <button data-preset="const_a" class="d3_btn-preset bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 py-1.5 px-2 rounded-lg text-left text-neutral-300 transition-colors">2. Const Accel</button>
+              <button data-preset="damped" class="d3_btn-preset bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 py-1.5 px-2 rounded-lg text-left text-neutral-300 transition-colors">3. Damped Osc</button>
+              <button data-preset="bounce" class="d3_btn-preset bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 py-1.5 px-2 rounded-lg text-left text-neutral-300 transition-colors">4. Bouncing Dot</button>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-xs font-mono mb-1"><span class="text-white font-semibold">Position (x)</span><span id="d3_lblPos" class="text-white font-bold">0.0 m</span></div>
+              <input type="range" id="d3_inPos" min="-100" max="100" value="0" step="0.5" class="w-full">
+            </div>
+            <div>
+              <div class="flex justify-between text-xs font-mono mb-1"><span class="text-cyan-400 font-semibold">Velocity (v)</span><span id="d3_lblVel" class="text-cyan-400 font-bold">0.0 m/s</span></div>
+              <input type="range" id="d3_inVel" min="-50" max="50" value="0" step="0.5" class="w-full">
+            </div>
+            <div>
+              <div class="flex justify-between text-xs font-mono mb-1"><span class="text-fuchsia-400 font-semibold">Acceleration (a)</span><span id="d3_lblAcc" class="text-fuchsia-400 font-bold">0.0 m/s²</span></div>
+              <input type="range" id="d3_inAcc" min="-25" max="25" value="0" step="0.5" class="w-full">
+            </div>
+          </div>
+          <div class="pt-3 border-t border-neutral-800/80 flex justify-between items-center text-xs font-mono text-neutral-400">
+            <div class="flex items-center gap-2">
+              <span>Sim Speed:</span>
+              <select id="d3_selSpeed" class="bg-neutral-900 border border-neutral-700 rounded text-white px-2 py-0.5 outline-none">
+                <option value="0.25">0.25x</option><option value="0.5">0.5x</option><option value="1.0" selected>1.0x</option><option value="2.0">2.0x</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: Graphs -->
+      <div class="w-full lg:w-7/12 flex flex-col gap-4">
+        <!-- Position Graph -->
+        <div class="canvas-card rounded-2xl p-4 flex flex-col relative h-56">
+          <div class="flex justify-between items-center mb-1 z-10 font-mono">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-white bg-neutral-800/90 border border-neutral-700 px-2 py-0.5 rounded">Position x(t)</span>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] text-neutral-400">TANGENT SLOPE (dx/dt)</div>
+              <div class="text-xs sm:text-sm font-bold text-yellow-400 glow-tangent">m = <span id="d3_slopeX">+0.00</span> m/s</div>
+            </div>
+          </div>
+          <div class="flex-1 w-full relative mt-1 overflow-hidden rounded-lg"><canvas id="d3_canvasX"></canvas></div>
+        </div>
+        <!-- Velocity Graph -->
+        <div class="canvas-card rounded-2xl p-4 flex flex-col relative h-56">
+          <div class="flex justify-between items-center mb-1 z-10 font-mono">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-cyan-400 bg-neutral-800/90 border border-neutral-700 px-2 py-0.5 rounded">Velocity v(t)</span>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] text-neutral-400">TANGENT SLOPE (dv/dt)</div>
+              <div class="text-xs sm:text-sm font-bold text-yellow-400 glow-tangent">m = <span id="d3_slopeV">+0.00</span> m/s²</div>
+            </div>
+          </div>
+          <div class="flex-1 w-full relative mt-1 overflow-hidden rounded-lg"><canvas id="d3_canvasV"></canvas></div>
+        </div>
+        <!-- Acceleration Graph -->
+        <div class="canvas-card rounded-2xl p-4 flex flex-col relative h-52">
+          <div class="flex justify-between items-center mb-1 z-10 font-mono">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-fuchsia-400 bg-neutral-800/90 border border-neutral-700 px-2 py-0.5 rounded">Acceleration a(t)</span>
+            </div>
+            <div class="text-right">
+              <div class="text-[10px] text-neutral-400">INSTANTANEOUS VALUE</div>
+              <div class="text-xs sm:text-sm font-bold text-fuchsia-400">a = <span id="d3_valA">+0.00</span> m/s²</div>
+            </div>
+          </div>
+          <div class="flex-1 w-full relative mt-1 overflow-hidden rounded-lg"><canvas id="d3_canvasA"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    /* =====================================================================
+       SECTION 1: Distance Simulator Logic
+       ===================================================================== */
+    (() => {
+      let maxScale = 100;
+      let normalizedVal = 0;
+      let isDragging = false;
+
+      const sliderTrack = document.getElementById('d1_sliderTrack');
+      const sliderDot = document.getElementById('d1_sliderDot');
+      const vectorLine = document.getElementById('d1_vectorLine');
+      const vectorArrowHead = document.getElementById('d1_vectorArrowHead');
+      const vectorArrowSvg = document.getElementById('d1_vectorArrowSvg');
+      const distanceDisplay = document.getElementById('d1_distanceDisplay');
+      const offsetSignedDisplay = document.getElementById('d1_offsetSignedDisplay');
+      const directionBadge = document.getElementById('d1_directionBadge');
+      const leftBoundLabel = document.getElementById('d1_leftBoundLabel');
+      const rightBoundLabel = document.getElementById('d1_rightBoundLabel');
+      const statusMin = document.getElementById('d1_statusMin');
+      const statusMax = document.getElementById('d1_statusMax');
+      
+      const resetBtn = document.getElementById('d1_resetBtn');
+      const invertBtn = document.getElementById('d1_invertBtn');
+      const scale100 = document.getElementById('d1_scale100');
+      const scale500 = document.getElementById('d1_scale500');
+      const scale1 = document.getElementById('d1_scale1');
+
+      function updateUI() {
+        const actualVal = normalizedVal * maxScale;
+        const absoluteDistance = Math.abs(actualVal);
+        const percentPosition = ((normalizedVal + 1) / 2) * 100;
+
+        sliderDot.style.left = `${percentPosition}%`;
+
+        if (Math.abs(normalizedVal) < 0.001) {
+          vectorLine.style.width = '0%';
+          vectorLine.style.left = '50%';
+          vectorArrowHead.style.display = 'none';
+        } else if (normalizedVal > 0) {
+          vectorLine.style.left = '50%';
+          vectorLine.style.width = `${percentPosition - 50}%`;
+          vectorArrowHead.style.display = 'block';
+          vectorArrowHead.style.left = `${percentPosition}%`;
+          vectorArrowSvg.style.transform = 'rotate(0deg)';
+        } else {
+          vectorLine.style.left = `${percentPosition}%`;
+          vectorLine.style.width = `${50 - percentPosition}%`;
+          vectorArrowHead.style.display = 'block';
+          vectorArrowHead.style.left = `${percentPosition}%`;
+          vectorArrowSvg.style.transform = 'rotate(180deg)';
+        }
+
+        const decimals = maxScale <= 1 ? 2 : (maxScale <= 100 ? 1 : 0);
+        distanceDisplay.textContent = absoluteDistance.toFixed(decimals);
+        const signStr = actualVal > 0 ? `+${actualVal.toFixed(decimals)}` : actualVal.toFixed(decimals);
+        offsetSignedDisplay.textContent = `Offset: ${signStr}`;
+
+        if (Math.abs(actualVal) < 0.001) {
+          directionBadge.textContent = 'AT ORIGIN';
+          directionBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-white font-medium';
+        } else if (actualVal < 0) {
+          directionBadge.textContent = '← LEFT OF ORIGIN';
+          directionBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-300 border border-amber-800/40';
+        } else {
+          directionBadge.textContent = 'RIGHT OF ORIGIN →';
+          directionBadge.className = 'text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/60 text-cyan-300 border border-cyan-800/40';
+        }
+      }
+
+      function setPositionFromClientX(clientX) {
+        const rect = sliderTrack.getBoundingClientRect();
+        const clickX = clientX - rect.left;
+        let clampedX = Math.max(0, Math.min(rect.width, clickX));
+        let ratio = clampedX / rect.width;
+        let newVal = (ratio * 2) - 1;
+        if (Math.abs(newVal) < 0.03) newVal = 0;
+        normalizedVal = newVal;
+        updateUI();
+      }
+
+      sliderTrack.addEventListener('mousedown', (e) => { isDragging = true; setPositionFromClientX(e.clientX); });
+      window.addEventListener('mousemove', (e) => { if (isDragging) setPositionFromClientX(e.clientX); });
+      window.addEventListener('mouseup', () => { if (isDragging) isDragging = false; });
+      sliderTrack.addEventListener('touchstart', (e) => { isDragging = true; if (e.touches.length > 0) setPositionFromClientX(e.touches[0].clientX); }, { passive: true });
+      window.addEventListener('touchmove', (e) => { if (isDragging && e.touches.length > 0) setPositionFromClientX(e.touches[0].clientX); }, { passive: true });
+      window.addEventListener('touchend', () => { isDragging = false; });
+
+      window.addEventListener('keydown', (e) => {
+        const step = 0.05;
+        if (e.key === 'ArrowLeft') { normalizedVal = Math.max(-1, normalizedVal - step); updateUI(); }
+        else if (e.key === 'ArrowRight') { normalizedVal = Math.min(1, normalizedVal + step); updateUI(); }
+        else if (e.key === 'Home' || e.key === '0') { normalizedVal = 0; updateUI(); }
+      });
+
+      resetBtn.addEventListener('click', () => { normalizedVal = 0; updateUI(); });
+      invertBtn.addEventListener('click', () => { normalizedVal = -normalizedVal; updateUI(); });
+
+      function setScale(scaleValue, activeBtn) {
+        maxScale = scaleValue;
+        [scale100, scale500, scale1].forEach(btn => btn.className = 'px-3 py-1 rounded-full hover:bg-neutral-800 text-neutral-400 transition-all');
+        activeBtn.className = 'px-3 py-1 rounded-full bg-white text-black font-semibold transition-all';
+
+        if (maxScale === 1) {
+          leftBoundLabel.textContent = '-1.00'; rightBoundLabel.textContent = '+1.00';
+          statusMin.textContent = '-1.00'; statusMax.textContent = '+1.00';
+        } else {
+          leftBoundLabel.textContent = `-${maxScale}`; rightBoundLabel.textContent = `+${maxScale}`;
+          statusMin.textContent = `-${maxScale}`; statusMax.textContent = `+${maxScale}`;
+        }
+        updateUI();
+      }
+
+      scale100.addEventListener('click', () => setScale(100, scale100));
+      scale500.addEventListener('click', () => setScale(500, scale500));
+      scale1.addEventListener('click', () => setScale(1, scale1));
+
+      window.addEventListener('resize', updateUI);
+      updateUI();
+    })();
+
+    /* =====================================================================
+       SECTION 2: Velocity Simulator Logic
+       ===================================================================== */
+    (() => {
+      let position = 0;
+      let velocity = 0;
+      let maxBoundary = 100;
+      let isPlaying = false;
+      let boundaryMode = 'bounce';
+      let isDragging = false;
+      let lastTimestamp = null;
+
+      const sliderTrack = document.getElementById('d2_sliderTrack');
+      const sliderDot = document.getElementById('d2_sliderDot');
+      const posVectorLine = document.getElementById('d2_posVectorLine');
+      const posArrowHead = document.getElementById('d2_posArrowHead');
+      const posArrowSvg = document.getElementById('d2_posArrowSvg');
+      const velVectorLine = document.getElementById('d2_velVectorLine');
+      const velArrowHead = document.getElementById('d2_velArrowHead');
+      const velArrowSvg = document.getElementById('d2_velArrowSvg');
+
+      const distanceDisplay = document.getElementById('d2_distanceDisplay');
+      const positionDisplay = document.getElementById('d2_positionDisplay');
+      const velocityDisplay = document.getElementById('d2_velocityDisplay');
+      const statusBadge = document.getElementById('d2_statusBadge');
+      
+      const posRange = document.getElementById('d2_posRange');
+      const posRangeVal = document.getElementById('d2_posRangeVal');
+      const velRange = document.getElementById('d2_velRange');
+      const velRangeVal = document.getElementById('d2_velRangeVal');
+
+      const playPauseBtn = document.getElementById('d2_playPauseBtn');
+      const playPauseText = document.getElementById('d2_playPauseText');
+      const playIcon = document.getElementById('d2_playIcon');
+      const pauseIcon = document.getElementById('d2_pauseIcon');
+      const resetBtn = document.getElementById('d2_resetBtn');
+      const zeroVelBtn = document.getElementById('d2_zeroVelBtn');
+      const reverseVelBtn = document.getElementById('d2_reverseVelBtn');
+      const bounceModeBtn = document.getElementById('d2_bounceModeBtn');
+      const stopModeBtn = document.getElementById('d2_stopModeBtn');
+
+      function render() {
+        const normPos = position / maxBoundary;
+        const percentPos = ((normPos + 1) / 2) * 100;
+
+        sliderDot.style.left = `${percentPos}%`;
+
+        if (Math.abs(position) < 0.1) {
+          posVectorLine.style.width = '0%';
+          posVectorLine.style.left = '50%';
+          posArrowHead.style.display = 'none';
+        } else if (position > 0) {
+          posVectorLine.style.left = '50%';
+          posVectorLine.style.width = `${percentPos - 50}%`;
+          posArrowHead.style.display = 'block';
+          posArrowHead.style.left = `${percentPos}%`;
+          posArrowSvg.style.transform = 'rotate(0deg)';
+        } else {
+          posVectorLine.style.left = `${percentPos}%`;
+          posVectorLine.style.width = `${50 - percentPos}%`;
+          posArrowHead.style.display = 'block';
+          posArrowHead.style.left = `${percentPos}%`;
+          posArrowSvg.style.transform = 'rotate(180deg)';
+        }
+
+        const absVel = Math.abs(velocity);
+        if (absVel < 0.1) {
+          velVectorLine.style.width = '0%';
+          velArrowHead.style.display = 'none';
+        } else {
+          const velVectorLengthPercent = (absVel / 50) * 20; 
+          velArrowHead.style.display = 'block';
+          if (velocity > 0) {
+            velVectorLine.style.left = `${percentPos}%`;
+            velVectorLine.style.width = `${velVectorLengthPercent}%`;
+            velArrowHead.style.left = `${percentPos + velVectorLengthPercent}%`;
+            velArrowSvg.style.transform = 'rotate(0deg)';
+          } else {
+            velVectorLine.style.left = `${percentPos - velVectorLengthPercent}%`;
+            velVectorLine.style.width = `${velVectorLengthPercent}%`;
+            velArrowHead.style.left = `${percentPos - velVectorLengthPercent}%`;
+            velArrowSvg.style.transform = 'rotate(180deg)';
+          }
+        }
+
+        distanceDisplay.textContent = Math.abs(position).toFixed(1);
+        positionDisplay.textContent = (position > 0 ? `+${position.toFixed(1)}` : position.toFixed(1));
+        velocityDisplay.textContent = (velocity > 0 ? `+${velocity.toFixed(1)}` : velocity.toFixed(1));
+
+        if (!isDragging) {
+          posRange.value = position;
+          posRangeVal.textContent = `${position > 0 ? '+' : ''}${Math.round(position)}m`;
+        }
+        velRange.value = velocity;
+        velRangeVal.textContent = `${velocity > 0 ? '+' : ''}${Math.round(velocity)} m/s`;
+      }
+
+      function step(timestamp) {
+        if (!lastTimestamp) lastTimestamp = timestamp;
+        const deltaTime = (timestamp - lastTimestamp) / 1000;
+        lastTimestamp = timestamp;
+
+        if (isPlaying && !isDragging) {
+          position += velocity * deltaTime * 1.5;
+          if (position >= maxBoundary) {
+            position = maxBoundary;
+            if (boundaryMode === 'bounce') velocity = -velocity;
+            else { velocity = 0; pauseSimulation(); }
+          } else if (position <= -maxBoundary) {
+            position = -maxBoundary;
+            if (boundaryMode === 'bounce') velocity = -velocity;
+            else { velocity = 0; pauseSimulation(); }
+          }
+          render();
+        }
+        requestAnimationFrame(step);
+      }
+
+      function startSimulation() {
+        isPlaying = true;
+        lastTimestamp = null;
+        playPauseText.textContent = "Pause";
+        playIcon.classList.add('hidden');
+        pauseIcon.classList.remove('hidden');
+        statusBadge.textContent = "MOVING";
+        statusBadge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800/50";
+      }
+
+      function pauseSimulation() {
+        isPlaying = false;
+        playPauseText.textContent = "Play Motion";
+        playIcon.classList.remove('hidden');
+        pauseIcon.classList.add('hidden');
+        statusBadge.textContent = "PAUSED";
+        statusBadge.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-neutral-400";
+      }
+
+      playPauseBtn.addEventListener('click', () => { isPlaying ? pauseSimulation() : startSimulation(); });
+      resetBtn.addEventListener('click', () => { position = 0; velocity = 0; pauseSimulation(); render(); });
+      zeroVelBtn.addEventListener('click', () => { velocity = 0; render(); });
+      reverseVelBtn.addEventListener('click', () => { velocity = -velocity; render(); });
+      posRange.addEventListener('input', (e) => { position = parseFloat(e.target.value); render(); });
+      velRange.addEventListener('input', (e) => { velocity = parseFloat(e.target.value); render(); });
+
+      function setPositionFromClientX(clientX) {
+        const rect = sliderTrack.getBoundingClientRect();
+        const clickX = clientX - rect.left;
+        let clampedX = Math.max(0, Math.min(rect.width, clickX));
+        let normVal = ((clampedX / rect.width) * 2) - 1;
+        if (Math.abs(normVal) < 0.03) normVal = 0;
+        position = normVal * maxBoundary;
+        render();
+      }
+
+      sliderTrack.addEventListener('mousedown', (e) => { isDragging = true; setPositionFromClientX(e.clientX); });
+      window.addEventListener('mousemove', (e) => { if (isDragging) setPositionFromClientX(e.clientX); });
+      window.addEventListener('mouseup', () => { isDragging = false; });
+      sliderTrack.addEventListener('touchstart', (e) => { isDragging = true; if (e.touches.length > 0) setPositionFromClientX(e.touches[0].clientX); }, { passive: true });
+      window.addEventListener('touchmove', (e) => { if (isDragging && e.touches.length > 0) setPositionFromClientX(e.touches[0].clientX); }, { passive: true });
+      window.addEventListener('touchend', () => { isDragging = false; });
+
+      bounceModeBtn.addEventListener('click', () => {
+        boundaryMode = 'bounce';
+        bounceModeBtn.className = 'px-2.5 py-1 rounded-md bg-neutral-800 text-white font-mono text-[11px]';
+        stopModeBtn.className = 'px-2.5 py-1 rounded-md text-neutral-400 hover:text-white font-mono text-[11px]';
+      });
+
+      stopModeBtn.addEventListener('click', () => {
+        boundaryMode = 'stop';
+        stopModeBtn.className = 'px-2.5 py-1 rounded-md bg-neutral-800 text-white font-mono text-[11px]';
+        bounceModeBtn.className = 'px-2.5 py-1 rounded-md text-neutral-400 hover:text-white font-mono text-[11px]';
+      });
+
+      requestAnimationFrame(step);
+      render();
+    })();
+
+    /* =====================================================================
+       SECTION 3: Acceleration & Graphs Logic
+       ===================================================================== */
+    (() => {
+      let t = 0; let x = 0; let v = 0; let a = 0;
+      let isPlaying = false; let simSpeed = 1.0; let activePreset = null; let lastTime = 0;
+      const TIME_WINDOW = 12; let historyData = [];
+      let isHoveringGraph = false; let hoverTime = null; let isDraggingTrack = false;
+
+      const domPosDot = document.getElementById('d3_posDot');
+      const domVelLine = document.getElementById('d3_velLine');
+      const domVelHead = document.getElementById('d3_velHead');
+      const domAccLine = document.getElementById('d3_accLine');
+      const domAccHead = document.getElementById('d3_accHead');
+      const domTrackContainer = document.getElementById('d3_trackContainer');
+
+      const domInPos = document.getElementById('d3_inPos');
+      const domInVel = document.getElementById('d3_inVel');
+      const domInAcc = document.getElementById('d3_inAcc');
+      const domLblPos = document.getElementById('d3_lblPos');
+      const domLblVel = document.getElementById('d3_lblVel');
+      const domLblAcc = document.getElementById('d3_lblAcc');
+      const domLblDist = document.getElementById('d3_lblDist');
+      const domLblTime = document.getElementById('d3_lblTime');
+      const domSelSpeed = document.getElementById('d3_selSpeed');
+
+      const domBtnPlay = document.getElementById('d3_btnPlay');
+      const domBtnStep = document.getElementById('d3_btnStep');
+      const domBtnReset = document.getElementById('d3_btnReset');
+      const domSlopeX = document.getElementById('d3_slopeX');
+      const domSlopeV = document.getElementById('d3_slopeV');
+      const domValA = document.getElementById('d3_valA');
+
+      const cvsX = document.getElementById('d3_canvasX'); const ctxX = cvsX.getContext('2d');
+      const cvsV = document.getElementById('d3_canvasV'); const ctxV = cvsV.getContext('2d');
+      const cvsA = document.getElementById('d3_canvasA'); const ctxA = cvsA.getContext('2d');
+
+      function setupCanvasScaling(canvas, ctx) {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = rect.width * dpr; canvas.height = rect.height * dpr;
+        ctx.resetTransform(); ctx.scale(dpr, dpr);
+        return { width: rect.width, height: rect.height };
+      }
+
+      let sizeX, sizeV, sizeA;
+      function resizeAllCanvases() {
+        sizeX = setupCanvasScaling(cvsX, ctxX);
+        sizeV = setupCanvasScaling(cvsV, ctxV);
+        sizeA = setupCanvasScaling(cvsA, ctxA);
+        drawAllGraphs();
+      }
+      window.addEventListener('resize', resizeAllCanvases);
+
+      function mapValue(val, inMin, inMax, outMin, outMax) {
+        return (val - inMin) * (outMax - outMin) / (inMax - inMin) + outMin;
+      }
+
+      function updateTrackUI() {
+        const width = domTrackContainer.getBoundingClientRect().width;
+        const clampedX = Math.max(-100, Math.min(100, x));
+        const pxX = mapValue(clampedX, -100, 100, 0, width);
+        
+        domPosDot.style.left = `${pxX}px`;
+
+        const vScale = 1.6; const vLen = Math.abs(v) * vScale;
+        domVelLine.style.left = `${pxX}px`; domVelLine.style.width = `${vLen}px`;
+        domVelHead.style.left = `${pxX + (v >= 0 ? vLen : -vLen)}px`;
+        domVelLine.style.transform = v >= 0 ? 'scaleX(1)' : 'scaleX(-1)';
+        domVelHead.style.transform = `rotate(${v >= 0 ? '0deg' : '180deg'}) translateY(-50%)`;
+        domVelHead.style.display = Math.abs(v) < 0.1 ? 'none' : 'block';
+
+        const aScale = 2.8; const aLen = Math.abs(a) * aScale;
+        domAccLine.style.left = `${pxX}px`; domAccLine.style.width = `${aLen}px`;
+        domAccHead.style.left = `${pxX + (a >= 0 ? aLen : -aLen)}px`;
+        domAccLine.style.transform = a >= 0 ? 'scaleX(1)' : 'scaleX(-1)';
+        domAccHead.style.transform = `rotate(${a >= 0 ? '0deg' : '180deg'}) translateY(-50%)`;
+        domAccHead.style.display = Math.abs(a) < 0.1 ? 'none' : 'block';
+
+        if (document.activeElement !== domInPos) domInPos.value = x;
+        if (document.activeElement !== domInVel) domInVel.value = v;
+        if (document.activeElement !== domInAcc) domInAcc.value = a;
+
+        domLblPos.textContent = `${x >= 0 ? '+' : ''}${x.toFixed(1)} m`;
+        domLblVel.textContent = `${v >= 0 ? '+' : ''}${v.toFixed(1)} m/s`;
+        domLblAcc.textContent = `${a >= 0 ? '+' : ''}${a.toFixed(1)} m/s²`;
+        domLblDist.textContent = Math.abs(x).toFixed(1);
+        domLblTime.textContent = t.toFixed(2);
+      }
+
+      function renderConstrictedGraph(ctx, size, dataKey, lineColor, yMin, yMax, showTangent) {
+        if(!size) return;
+        const { width: W, height: H } = size;
+        ctx.clearRect(0, 0, W, H);
+
+        const padLeft = 45, padRight = 15, padTop = 15, padBottom = 25;
+        const plotX = padLeft, plotY = padTop, plotW = W - padLeft - padRight, plotH = H - padTop - padBottom;
+        if (plotW <= 0 || plotH <= 0) return;
+
+        const tMax = Math.max(TIME_WINDOW, t);
+        const tMin = tMax - TIME_WINDOW;
+
+        const getPxX = (timeVal) => mapValue(timeVal, tMin, tMax, plotX, plotX + plotW);
+        const getPxY = (physVal) => mapValue(physVal, yMin, yMax, plotY + plotH, plotY);
+
+        ctx.save();
+        ctx.fillStyle = '#6b7280'; ctx.font = '10px "JetBrains Mono", monospace'; ctx.textAlign = 'right';
+        ctx.fillText(`${yMax > 0 ? '+' : ''}${yMax}`, padLeft - 6, plotY + 10);
+        ctx.fillText('0', padLeft - 6, getPxY(0) + 3);
+        ctx.fillText(`${yMin}`, padLeft - 6, plotY + plotH - 2);
+        
+        ctx.textAlign = 'center';
+        ctx.fillText(`${tMin.toFixed(0)}s`, plotX, H - 8);
+        ctx.fillText(`${((tMin + tMax) / 2).toFixed(1)}s`, plotX + plotW / 2, H - 8);
+        ctx.fillText(`${tMax.toFixed(0)}s`, plotX + plotW, H - 8);
+        
+        ctx.strokeStyle = '#27272a'; ctx.lineWidth = 1; ctx.strokeRect(plotX, plotY, plotW, plotH);
+        ctx.restore();
+
+        ctx.save(); ctx.beginPath(); ctx.rect(plotX, plotY, plotW, plotH); ctx.clip();
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)'; ctx.lineWidth = 1; ctx.beginPath();
+        for (let gridY = yMin; gridY <= yMax; gridY += (yMax - yMin) / 4) { const py = getPxY(gridY); ctx.moveTo(plotX, py); ctx.lineTo(plotX + plotW, py); }
+        for (let gridT = tMin; gridT <= tMax; gridT += TIME_WINDOW / 6) { const px = getPxX(gridT); ctx.moveTo(px, plotY); ctx.lineTo(px, plotY + plotH); }
+        ctx.stroke();
+
+        const yZeroPx = getPxY(0);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(plotX, yZeroPx); ctx.lineTo(plotX + plotW, yZeroPx); ctx.stroke(); ctx.setLineDash([]);
+
+        if (historyData.length > 0) {
+          ctx.beginPath(); ctx.strokeStyle = lineColor; ctx.lineWidth = 2.2;
+          let started = false;
+          for (let i = 0; i < historyData.length; i++) {
+            const pt = historyData[i];
+            if (pt.t < tMin - 0.5) continue;
+            const px = getPxX(pt.t); const py = getPxY(pt[dataKey]);
+            if (!started) { ctx.moveTo(px, py); started = true; } else { ctx.lineTo(px, py); }
+          }
+          ctx.stroke();
+        }
+
+        let inspectTime = isHoveringGraph && hoverTime !== null ? hoverTime : t;
+        let targetPt = getInterpolatedPoint(inspectTime);
+
+        if (targetPt) {
+          const inspectPx = getPxX(inspectTime); const inspectPy = getPxY(targetPt[dataKey]);
+          ctx.strokeStyle = 'rgba(250, 204, 21, 0.5)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+          ctx.beginPath(); ctx.moveTo(inspectPx, plotY); ctx.lineTo(inspectPx, plotY + plotH); ctx.stroke(); ctx.setLineDash([]);
+
+          ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.arc(inspectPx, inspectPy, 4.5, 0, Math.PI * 2); ctx.fill();
+
+          if (showTangent) {
+            let slopeVal = dataKey === 'x' ? targetPt.v : targetPt.a;
+            const dtSpan = 2.5;
+            const tanPx1 = getPxX(inspectTime - dtSpan); const tanPy1 = getPxY(targetPt[dataKey] - slopeVal * dtSpan);
+            const tanPx2 = getPxX(inspectTime + dtSpan); const tanPy2 = getPxY(targetPt[dataKey] + slopeVal * dtSpan);
+
+            ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2; ctx.shadowColor = 'rgba(250, 204, 21, 0.6)'; ctx.shadowBlur = 6;
+            ctx.beginPath(); ctx.moveTo(tanPx1, tanPy1); ctx.lineTo(tanPx2, tanPy2); ctx.stroke(); ctx.shadowBlur = 0;
+
+            const triDt = 1.5; const triPx1 = getPxX(inspectTime + triDt); const triPy2 = getPxY(targetPt[dataKey] + slopeVal * triDt);
+            ctx.fillStyle = 'rgba(250, 204, 21, 0.18)';
+            ctx.beginPath(); ctx.moveTo(inspectPx, inspectPy); ctx.lineTo(triPx1, inspectPy); ctx.lineTo(triPx1, triPy2); ctx.closePath(); ctx.fill();
+            
+            ctx.strokeStyle = 'rgba(250, 204, 21, 0.8)'; ctx.lineWidth = 1; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]);
+          }
+        }
+        ctx.restore();
+      }
+
+      function getInterpolatedPoint(targetT) {
+        if (historyData.length === 0) return { t: 0, x: 0, v: 0, a: 0 };
+        if (targetT <= historyData[0].t) return historyData[0];
+        if (targetT >= historyData[historyData.length - 1].t) return historyData[historyData.length - 1];
+        for (let i = 0; i < historyData.length - 1; i++) {
+          if (targetT >= historyData[i].t && targetT <= historyData[i + 1].t) {
+            const pt1 = historyData[i]; const pt2 = historyData[i + 1];
+            const factor = (targetT - pt1.t) / (pt2.t - pt1.t || 0.001);
+            return {
+              t: targetT, x: pt1.x + (pt2.x - pt1.x) * factor, v: pt1.v + (pt2.v - pt1.v) * factor, a: pt1.a + (pt2.a - pt1.a) * factor
+            };
+          }
+        }
+        return historyData[historyData.length - 1];
+      }
+
+      function drawAllGraphs() {
+        renderConstrictedGraph(ctxX, sizeX, 'x', '#ffffff', -100, 100, true);
+        renderConstrictedGraph(ctxV, sizeV, 'v', '#22d3ee', -50, 50, true);
+        renderConstrictedGraph(ctxA, sizeA, 'a', '#e879f9', -25, 25, false);
+
+        let inspectPt = getInterpolatedPoint(isHoveringGraph && hoverTime !== null ? hoverTime : t);
+        domSlopeX.textContent = `${inspectPt.v >= 0 ? '+' : ''}${inspectPt.v.toFixed(2)}`;
+        domSlopeV.textContent = `${inspectPt.a >= 0 ? '+' : ''}${inspectPt.a.toFixed(2)}`;
+        domValA.textContent = `${inspectPt.a >= 0 ? '+' : ''}${inspectPt.a.toFixed(2)}`;
+      }
+
+      function physicsStep(dt) {
+        if (dt <= 0) return;
+        if (activePreset === 'shm') a = -1.5 * x;
+        else if (activePreset === 'damped') a = -1.8 * x - 0.45 * v;
+        else if (activePreset === 'bounce') a = -15;
+
+        v = v + a * dt; x = x + v * dt; t = t + dt;
+
+        if (x > 100) { x = 100; v = -Math.abs(v) * (activePreset === 'bounce' ? 0.85 : 0.6); } 
+        else if (x < -100) { x = -100; v = Math.abs(v) * (activePreset === 'bounce' ? 0.85 : 0.6); }
+        v = Math.max(-50, Math.min(50, v));
+
+        historyData.push({ t, x, v, a });
+        while (historyData.length > 0 && historyData[0].t < t - 25) { historyData.shift(); }
+      }
+
+      function mainAnimationLoop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        let frameDt = (timestamp - lastTime) / 1000;
+        lastTime = timestamp;
+        if (frameDt > 0.1) frameDt = 0.1;
+
+        if (isPlaying) { physicsStep(frameDt * simSpeed); updateTrackUI(); drawAllGraphs(); }
+        requestAnimationFrame(mainAnimationLoop);
+      }
+
+      domBtnPlay.addEventListener('click', () => {
+        isPlaying = !isPlaying;
+        domBtnPlay.textContent = isPlaying ? 'PAUSE' : 'PLAY';
+        domBtnPlay.className = isPlaying
+          ? 'bg-yellow-400 text-black font-bold px-4 py-2 rounded-lg text-xs hover:bg-yellow-500 active:scale-95 transition-all shadow-md w-20'
+          : 'bg-white text-black font-bold px-4 py-2 rounded-lg text-xs hover:bg-neutral-200 active:scale-95 transition-all shadow-md w-20';
+        if (isPlaying) lastTime = performance.now();
+      });
+
+      domBtnStep.addEventListener('click', () => {
+        isPlaying = false; domBtnPlay.textContent = 'PLAY'; domBtnPlay.className = 'bg-white text-black font-bold px-4 py-2 rounded-lg text-xs hover:bg-neutral-200 active:scale-95 transition-all shadow-md w-20';
+        physicsStep(0.05); updateTrackUI(); drawAllGraphs();
+      });
+
+      domBtnReset.addEventListener('click', () => {
+        isPlaying = false; activePreset = null;
+        domBtnPlay.textContent = 'PLAY'; domBtnPlay.className = 'bg-white text-black font-bold px-4 py-2 rounded-lg text-xs hover:bg-neutral-200 active:scale-95 transition-all shadow-md w-20';
+        t = 0; x = 0; v = 0; a = 0;
+        historyData = [{ t, x, v, a }];
+        document.querySelectorAll('.d3_btn-preset').forEach(b => b.classList.remove('border-yellow-400', 'text-yellow-400'));
+        updateTrackUI(); drawAllGraphs();
+      });
+
+      function onManualSliderInput() {
+        activePreset = null;
+        document.querySelectorAll('.d3_btn-preset').forEach(b => b.classList.remove('border-yellow-400', 'text-yellow-400'));
+        x = parseFloat(domInPos.value); v = parseFloat(domInVel.value); a = parseFloat(domInAcc.value);
+        if (!isPlaying) {
+          if (historyData.length > 0 && Math.abs(historyData[historyData.length - 1].t - t) < 0.001) { historyData[historyData.length - 1] = { t, x, v, a }; } 
+          else { historyData.push({ t, x, v, a }); }
+          updateTrackUI(); drawAllGraphs();
+        }
+      }
+
+      domInPos.addEventListener('input', onManualSliderInput);
+      domInVel.addEventListener('input', onManualSliderInput);
+      domInAcc.addEventListener('input', onManualSliderInput);
+      domSelSpeed.addEventListener('change', (e) => { simSpeed = parseFloat(e.target.value); });
+
+      document.querySelectorAll('.d3_btn-preset').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          document.querySelectorAll('.d3_btn-preset').forEach(b => b.classList.remove('border-yellow-400', 'text-yellow-400'));
+          e.currentTarget.classList.add('border-yellow-400', 'text-yellow-400');
+          activePreset = e.currentTarget.getAttribute('data-preset');
+          t = 0; historyData = [];
+          
+          if (activePreset === 'shm') { x = 75; v = 0; a = -1.5 * x; } 
+          else if (activePreset === 'const_a') { x = -80; v = 35; a = -8; } 
+          else if (activePreset === 'damped') { x = 90; v = 0; a = -1.8 * x; } 
+          else if (activePreset === 'bounce') { x = 80; v = 15; a = -15; }
+          
+          historyData.push({ t, x, v, a });
+          updateTrackUI(); drawAllGraphs();
+        });
+      });
+
+      function setPositionFromTrackMouseEvent(e) {
+        const rect = domTrackContainer.getBoundingClientRect();
+        x = Math.max(-100, Math.min(100, mapValue(e.clientX - rect.left, 0, rect.width, -100, 100)));
+        domInPos.value = x; onManualSliderInput();
+      }
+
+      domTrackContainer.addEventListener('mousedown', (e) => { isDraggingTrack = true; setPositionFromTrackMouseEvent(e); });
+      window.addEventListener('mousemove', (e) => { if (isDraggingTrack) setPositionFromTrackMouseEvent(e); });
+      window.addEventListener('mouseup', () => { isDraggingTrack = false; });
+
+      [cvsX, cvsV, cvsA].forEach(canvas => {
+        canvas.addEventListener('mousemove', (e) => {
+          isHoveringGraph = true;
+          const rect = canvas.getBoundingClientRect();
+          const mousePxX = e.clientX - rect.left;
+          const padLeft = 45; const plotW = rect.width - padLeft - 15;
+          const tMax = Math.max(TIME_WINDOW, t);
+          hoverTime = mapValue(Math.max(padLeft, Math.min(rect.width - 15, mousePxX)), padLeft, padLeft + plotW, tMax - TIME_WINDOW, tMax);
+          drawAllGraphs();
+        });
+        canvas.addEventListener('mouseleave', () => { isHoveringGraph = false; hoverTime = null; drawAllGraphs(); });
+      });
+
+      window.addEventListener('load', () => {
+        resizeAllCanvases(); historyData.push({ t, x, v, a }); updateTrackUI(); drawAllGraphs(); requestAnimationFrame(mainAnimationLoop);
+      });
+    })();
+  </script>
+</body>
+</html>
