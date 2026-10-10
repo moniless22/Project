@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VSEPR 3D Chemistry Simulator</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Three.js for 3D Molecular Graphics -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <style>
+    /* Custom scrollbars and styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .atom-btn {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .atom-btn:hover {
+      transform: translateY(-2px) scale(1.05);
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .canvas-grid {
+      background-size: 24px 24px;
+      background-image: radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans overflow-hidden select-none bg-slate-950 text-slate-100">
+
+  <!-- Top Navigation Header -->
+  <header class="h-16 border-b border-slate-800 bg-slate-900/90 px-4 flex items-center justify-between z-20 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+        <i class="fa-solid font-bold fa-flask-vial text-lg"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-300 via-purple-200 to-pink-300 bg-clip-text text-transparent">
+          VSEPR ChemStudio 3D
+        </h1>
+        <p class="text-xs text-slate-400">Interactive Molecular Builder & VSEPR Geometry Inspector</p>
+      </div>
+    </div>
+
+    <!-- Center Control Bar -->
+    <div class="flex items-center gap-2 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+      <button id="view2dBtn" onclick="switchView('2d')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-indigo-600 text-white shadow">
+        <i class="fa-solid fa-draw-polygon"></i> 2D Canvas Builder
+      </button>
+      <button id="view3dBtn" onclick="switchView('3d')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-700">
+        <i class="fa-solid fa-cube"></i> 3D VSEPR Model
+      </button>
+    </div>
+
+    <!-- Quick Actions & Presets -->
+    <div class="flex items-center gap-3">
+      <div class="relative">
+        <select id="presetSelect" onchange="loadPresetMolecule(this.value)" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer">
+          <option value="">-- Quick Molecule Presets --</option>
+          <option value="H2O">Water (H₂O) - Bent</option>
+          <option value="CO2">Carbon Dioxide (CO₂) - Linear</option>
+          <option value="CH4">Methane (CH₄) - Tetrahedral</option>
+          <option value="NH3">Ammonia (NH₃) - Trigonal Pyramidal</option>
+          <option value="BF3">Boron Trifluoride (BF₃) - Trigonal Planar</option>
+          <option value="PCl5">Phosphorus Pentachloride (PCl₅) - Trigonal Bipyramidal</option>
+          <option value="SF6">Sulfur Hexafluoride (SF₆) - Octahedral</option>
+          <option value="SF4">Sulfur Tetrafluoride (SF₄) - Seesaw</option>
+          <option value="XeF4">Xenon Tetrafluoride (XeF₄) - Square Planar</option>
+          <option value="SO2">Sulfur Dioxide (SO₂) - Bent (120°)</option>
+          <option value="HCN">Hydrogen Cyanide (HCN) - Linear</option>
+          <option value="C2H4">Ethylene (C₂H₄) - Planar</option>
+        </select>
+      </div>
+
+      <button onclick="clearWorkspace()" class="px-3 py-2 bg-slate-800 hover:bg-rose-950/80 text-rose-400 hover:text-rose-300 border border-slate-700 hover:border-rose-800/60 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5" title="Clear Canvas">
+        <i class="fa-solid fa-trash-can"></i> Clear
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace Area -->
+  <div class="flex-1 flex relative overflow-hidden">
+
+    <!-- LEFT SIDEBAR: Periodic Table Atom Palette & Tools -->
+    <aside class="w-80 border-r border-slate-800 bg-slate-900/60 flex flex-col z-10 shrink-0">
+      
+      <div class="p-3 border-b border-slate-800 flex items-center justify-between">
+        <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-atom text-indigo-400"></i> Atom Palette
+        </h2>
+        <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-medium">Click to Select</span>
+      </div>
+
+      <!-- Selected Active Tool / Atom Indicator -->
+      <div class="px-4 py-3 bg-slate-800/50 border-b border-slate-800/80 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div id="activeAtomBadge" class="w-10 h-10 rounded-lg bg-slate-700 flex items-center justify-center font-bold text-lg text-white border-2 border-indigo-500 shadow-md">
+            C
+          </div>
+          <div>
+            <div id="activeAtomName" class="text-sm font-semibold text-white">Carbon</div>
+            <div id="activeAtomInfo" class="text-[11px] text-slate-400">Valence: 4 e⁻ | Max Octet: 8</div>
+          </div>
+        </div>
+        <div class="text-xs font-mono text-slate-400 bg-slate-900 px-2 py-1 rounded border border-slate-800">
+          EN: <span id="activeAtomEN" class="text-indigo-300">2.55</span>
+        </div>
+      </div>
+
+      <!-- Scrollable Element Selector Grid -->
+      <div class="flex-1 overflow-y-auto p-3 space-y-4">
+        
+        <!-- Non-Metals & Halogens -->
+        <div>
+          <div class="text-[11px] font-semibold text-slate-400 mb-2 px-1 flex items-center justify-between">
+            <span>Non-Metals & Halogens</span>
+            <span class="text-[10px] text-slate-500">Main Building Blocks</span>
+          </div>
+          <div class="grid grid-cols-4 gap-2" id="nonMetalsGrid">
+            <!-- Populated dynamically by JS -->
+          </div>
+        </div>
+
+        <!-- Expanded Octet / Period 3+ Non-Metals -->
+        <div>
+          <div class="text-[11px] font-semibold text-slate-400 mb-2 px-1 flex items-center justify-between">
+            <span>Expanded Octet Elements</span>
+            <span class="text-[10px] text-amber-400/90">P, S, Cl, Br, I, Xe</span>
+          </div>
+          <div class="grid grid-cols-4 gap-2" id="expandedGrid">
+            <!-- Populated dynamically by JS -->
+          </div>
+        </div>
+
+        <!-- 2D Canvas Tool Mode Picker -->
+        <div class="pt-2 border-t border-slate-800">
+          <div class="text-[11px] font-semibold text-slate-400 mb-2 px-1">Canvas Construction Tools</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="toolAddBtn" onclick="setTool('add')" class="p-2 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 bg-indigo-600/30 border-indigo-500 text-indigo-200">
+              <i class="fa-solid fa-plus-circle"></i> Add Atom
+            </button>
+            <button id="toolBondBtn" onclick="setTool('bond')" class="p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-medium flex items-center justify-center gap-2">
+              <i class="fa-solid fa-link"></i> Create Bond
+            </button>
+            <button id="toolOrderBtn" onclick="toggleBondOrderMode()" class="p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-medium flex items-center justify-center gap-2">
+              <i class="fa-solid fa-bars"></i> Order: <span id="currentBondOrderLabel" class="font-bold text-indigo-400">Single (1x)</span>
+            </button>
+            <button id="toolDeleteBtn" onclick="setTool('delete')" class="p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-medium flex items-center justify-center gap-2">
+              <i class="fa-solid fa-eraser"></i> Delete Tool
+            </button>
+          </div>
+        </div>
+
+        <!-- Instructions Card -->
+        <div class="bg-indigo-950/40 border border-indigo-900/60 rounded-xl p-3 text-xs text-indigo-200/90 space-y-1.5">
+          <div class="font-semibold text-indigo-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-info"></i> How to build:
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-[11px] text-slate-300">
+            <li>Click an element above, then click canvas to place atoms.</li>
+            <li>Drag from one atom to another to create bonds.</li>
+            <li>Click existing bonds to cycle order (1x, 2x, 3x).</li>
+            <li>Press <b>"3D VSEPR Model"</b> to generate accurate 3D geometry!</li>
+          </ul>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- CENTER VIEWPORT: 2D Builder Canvas & 3D Three.js Render Box -->
+    <main class="flex-1 relative bg-slate-950 flex flex-col overflow-hidden">
+      
+      <!-- Error Notification / Dropdown Alert Banner -->
+      <div id="errorAlertBox" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-30 max-w-xl w-11/12 bg-rose-950/95 border-2 border-rose-500/80 text-rose-100 rounded-xl shadow-2xl backdrop-blur-md p-4 transition-all duration-300 transform scale-100">
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+            <i class="fa-solid fa-triangle-exclamation text-lg"></i>
+          </div>
+          <div class="flex-1">
+            <div class="flex items-center justify-between">
+              <h3 class="font-bold text-sm text-rose-200 flex items-center gap-2" id="errorTitle">
+                VSEPR Chemical Rule Violation
+              </h3>
+              <button onclick="dismissError()" class="text-rose-400 hover:text-white text-xs p-1">
+                <i class="fa-solid fa-xmark text-base"></i>
+              </button>
+            </div>
+            <p id="errorMessage" class="text-xs text-rose-200/90 mt-1.5 leading-relaxed font-mono bg-rose-900/40 p-2.5 rounded-lg border border-rose-800/60">
+              Hydrogen cannot form more than 1 covalent bond.
+            </p>
+            <div class="mt-2.5 flex items-center justify-between">
+              <span class="text-[10px] text-rose-300/70 italic">Fix structure on 2D canvas to generate 3D VSEPR model</span>
+              <button onclick="autoFixStructure()" class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-[11px] font-medium transition-all shadow">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Auto-Balance Lone Pairs
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2D Canvas Container -->
+      <div id="container2D" class="absolute inset-0 canvas-grid flex items-center justify-center">
+        <canvas id="canvas2D" class="w-full h-full cursor-crosshair block"></canvas>
+        
+        <!-- Floating Canvas Action Overlay -->
+        <div class="absolute bottom-4 left-4 flex items-center gap-2 bg-slate-900/80 backdrop-blur-md p-1.5 rounded-xl border border-slate-800">
+          <button onclick="autoLayout2D()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-diagram-project text-indigo-400"></i> Auto-Clean Layout
+          </button>
+          <button onclick="autoAddLonePairs()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5">
+            <i class="fa-solid fa-sparkles text-amber-400"></i> Fill Lone Pairs
+          </button>
+        </div>
+      </div>
+
+      <!-- 3D Three.js Rendering Container -->
+      <div id="container3D" class="absolute inset-0 hidden bg-slate-950">
+        <canvas id="canvas3D" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+        
+        <!-- 3D Controls HUD Overlay -->
+        <div class="absolute bottom-4 left-4 flex items-center gap-3 bg-slate-900/80 backdrop-blur-md p-2 rounded-xl border border-slate-800 text-xs text-slate-300">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="autoRotateToggle" onchange="toggleAutoRotate(this.checked)" checked class="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500">
+            <span>Auto Rotate</span>
+          </label>
+          <span class="text-slate-700">|</span>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="showLonePairs3D" onchange="toggleLonePairs3D(this.checked)" checked class="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500">
+            <span>Lone Pair Clouds</span>
+          </label>
+          <span class="text-slate-700">|</span>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="showBondLabels" onchange="toggleBondLabels3D(this.checked)" checked class="rounded border-slate-700 text-indigo-600 focus:ring-indigo-500">
+            <span>Bond Vectors</span>
+          </label>
+        </div>
+
+        <!-- 3D Instruction Badge -->
+        <div class="absolute top-4 left-4 bg-slate-900/80 backdrop-blur border border-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 flex items-center gap-2">
+          <i class="fa-solid fa-arrows-spin text-indigo-400"></i> Left click + drag to rotate | Scroll to zoom
+        </div>
+      </div>
+
+    </main>
+
+    <!-- RIGHT SIDEBAR: Scientific Properties Inspector -->
+    <aside class="w-80 border-l border-slate-800 bg-slate-900/60 flex flex-col z-10 shrink-0">
+      
+      <div class="p-3 border-b border-slate-800 flex items-center justify-between">
+        <h2 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <i class="fa-solid fa-square-poll-vertical text-indigo-400"></i> Molecular Inspector
+        </h2>
+        <span id="validityBadge" class="text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+          Valid Structure
+        </span>
+      </div>
+
+      <!-- Scrollable Properties Dashboard -->
+      <div class="flex-1 overflow-y-auto p-4 space-y-4">
+        
+        <!-- Primary Formula & Geometry Overview Header -->
+        <div class="bg-gradient-to-br from-slate-800/80 to-slate-900/80 border border-slate-700/60 rounded-xl p-3.5 shadow-md">
+          <div class="text-[10px] text-slate-400 uppercase tracking-wide font-medium">Chemical Formula</div>
+          <div id="propFormula" class="text-2xl font-black text-white tracking-wider my-0.5">H₂O</div>
+          <div id="propIUPAC" class="text-xs font-medium text-indigo-300">Water / Oxidane</div>
+        </div>
+
+        <!-- VSEPR Geometry Summary Box -->
+        <div class="space-y-2">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">VSEPR Geometry Analysis</div>
+          
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="bg-slate-800/40 border border-slate-800 p-2.5 rounded-lg">
+              <div class="text-[10px] text-slate-400">VSEPR Class</div>
+              <div id="propAXE" class="font-mono font-bold text-indigo-400 text-sm mt-0.5">AX₂E₂</div>
+            </div>
+            <div class="bg-slate-800/40 border border-slate-800 p-2.5 rounded-lg">
+              <div class="text-[10px] text-slate-400">Steric Number</div>
+              <div id="propSteric" class="font-mono font-bold text-purple-400 text-sm mt-0.5">4</div>
+            </div>
+            <div class="bg-slate-800/40 border border-slate-800 p-2.5 rounded-lg col-span-2">
+              <div class="text-[10px] text-slate-400">Molecular Geometry</div>
+              <div id="propGeometry" class="font-semibold text-white mt-0.5">Bent (V-Shaped)</div>
+            </div>
+            <div class="bg-slate-800/40 border border-slate-800 p-2.5 rounded-lg">
+              <div class="text-[10px] text-slate-400">Electron Geometry</div>
+              <div id="propElectronGeom" class="font-medium text-slate-200 mt-0.5">Tetrahedral</div>
+            </div>
+            <div class="bg-slate-800/40 border border-slate-800 p-2.5 rounded-lg">
+              <div class="text-[10px] text-slate-400">Hybridization</div>
+              <div id="propHybrid" class="font-mono font-bold text-emerald-400 mt-0.5">sp³</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Geometry & Angle Specifications -->
+        <div class="space-y-2">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Bond Angles & Polarity</div>
+          <div class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 space-y-2 text-xs">
+            <div class="flex justify-between items-center border-b border-slate-800/60 pb-1.5">
+              <span class="text-slate-400">Ideal VSEPR Angle:</span>
+              <span id="propIdealAngle" class="font-mono font-semibold text-slate-200">109.5°</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-slate-800/60 pb-1.5">
+              <span class="text-slate-400">Calculated Angle:</span>
+              <span id="propActualAngle" class="font-mono font-bold text-indigo-300">104.5°</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-slate-800/60 pb-1.5">
+              <span class="text-slate-400">Net Molecular Polarity:</span>
+              <span id="propPolarity" class="font-semibold text-amber-400">Polar (Dipole &gt; 0)</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-slate-400">Molar Mass:</span>
+              <span id="propMass" class="font-mono text-slate-200">18.015 g/mol</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detailed Bond Metrics Table -->
+        <div class="space-y-2">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Bond Metrics & Orders</div>
+          <div class="bg-slate-800/40 border border-slate-800 rounded-lg overflow-hidden text-xs">
+            <table class="w-full text-left">
+              <thead class="bg-slate-800/80 text-[10px] uppercase text-slate-400 font-semibold border-b border-slate-700/60">
+                <tr>
+                  <th class="p-2">Bond Pair</th>
+                  <th class="p-2">Order</th>
+                  <th class="p-2">Length (Å)</th>
+                  <th class="p-2">Length (pm)</th>
+                </tr>
+              </thead>
+              <tbody id="bondMetricsTable" class="divide-y divide-slate-800/60 font-mono text-[11px]">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Formal Charge Inspector -->
+        <div class="space-y-2">
+          <div class="text-xs font-bold text-slate-400 uppercase tracking-wide">Formal Charges</div>
+          <div class="bg-slate-800/40 border border-slate-800 rounded-lg p-2.5 text-xs">
+            <div id="formalChargeList" class="space-y-1 font-mono text-[11px]">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    /* =========================================================================
+       1. ATOMIC DATABASE & CHEMICAL CONSTANTS
+       ========================================================================= */
+    const ELEMENTS = {
+      H:  { symbol: 'H',  name: 'Hydrogen',   valE: 1, maxOctet: 2,  en: 2.20, radius: 0.31, color: '#FFFFFF', period: 1 },
+      B:  { symbol: 'B',  name: 'Boron',      valE: 3, maxOctet: 6,  en: 2.04, radius: 0.85, color: '#FFB5B5', period: 2 },
+      C:  { symbol: 'C',  name: 'Carbon',     valE: 4, maxOctet: 8,  en: 2.55, radius: 0.76, color: '#909090', period: 2 },
+      N:  { symbol: 'N',  name: 'Nitrogen',   valE: 5, maxOctet: 8,  en: 3.04, radius: 0.71, color: '#3050F0', period: 2 },
+      O:  { symbol: 'O',  name: 'Oxygen',     valE: 6, maxOctet: 8,  en: 3.44, radius: 0.66, color: '#FF0D0D', period: 2 },
+      F:  { symbol: 'F',  name: 'Fluorine',   valE: 7, maxOctet: 8,  en: 3.98, radius: 0.57, color: '#90E050', period: 2 },
+      Si: { symbol: 'Si', name: 'Silicon',    valE: 4, maxOctet: 12, en: 1.90, radius: 1.11, color: '#DAA520', period: 3 },
+      P:  { symbol: 'P',  name: 'Phosphorus', valE: 5, maxOctet: 12, en: 2.19, radius: 1.07, color: '#FF8000', period: 3 },
+      S:  { symbol: 'S',  name: 'Sulfur',     valE: 6, maxOctet: 12, en: 2.58, radius: 1.05, color: '#FFFF30', period: 3 },
+      Cl: { symbol: 'Cl', name: 'Chlorine',   valE: 7, maxOctet: 12, en: 3.16, radius: 1.02, color: '#1FF01F', period: 3 },
+      Br: { symbol: 'Br', name: 'Bromine',    valE: 7, maxOctet: 12, en: 2.96, radius: 1.20, color: '#A62929', period: 4 },
+      I:  { symbol: 'I',  name: 'Iodine',     valE: 7, maxOctet: 12, en: 2.66, radius: 1.39, color: '#940094', period: 5 },
+      Xe: { symbol: 'Xe', name: 'Xenon',      valE: 8, maxOctet: 12, en: 2.60, radius: 1.40, color: '#4297B0', period: 5 },
+      Be: { symbol: 'Be', name: 'Beryllium',  valE: 2, maxOctet: 4,  en: 1.57, radius: 0.96, color: '#C2FF00', period: 2 }
+    };
+
+    const ATOMIC_MASSES = {
+      H: 1.008, B: 10.81, C: 12.011, N: 14.007, O: 15.999, F: 18.998,
+      Si: 28.085, P: 30.974, S: 32.06, Cl: 35.45, Br: 79.904, I: 126.90, Xe: 131.29, Be: 9.012
+    };
+
+    // Global Application State
+    let activeElement = 'C';
+    let currentTool = 'add'; // 'add', 'bond', 'delete'
+    let currentBondOrder = 1; // 1, 2, 3
+    let activeView = '2d'; // '2d' or '3d'
+    
+    // Canvas Nodes (Atoms) & Links (Bonds)
+    let nodes = [];
+    let links = [];
+    let selectedNodeId = null;
+    let hoveredNodeId = null;
+    let draggingNodeId = null;
+    let dragOffset = { x: 0, y: 0 };
+    let bondStartNodeId = null;
+
+    // 3D Engine Variables
+    let scene3D, camera3D, renderer3D, controls3D;
+    let molecularGroup3D = null;
+    let lonePairGroup3D = null;
+    let bondLabelsGroup3D = null;
+    let is3DInitialized = false;
+
+    /* =========================================================================
+       2. INITIALIZATION & UI POPULATION
+       ========================================================================= */
+    window.addEventListener('load', () => {
+      populateElementPalette();
+      init2DCanvas();
+      loadPresetMolecule('H2O');
+      updateUIState();
+    });
+
+    function populateElementPalette() {
+      const nonMetalsGrid = document.getElementById('nonMetalsGrid');
+      const expandedGrid = document.getElementById('expandedGrid');
+      
+      nonMetalsGrid.innerHTML = '';
+      expandedGrid.innerHTML = '';
+
+      const nonMetalSymbols = ['H', 'C', 'N', 'O', 'F', 'B', 'Be'];
+      const expandedSymbols = ['Si', 'P', 'S', 'Cl', 'Br', 'I', 'Xe'];
+
+      const createButton = (sym) => {
+        const el = ELEMENTS[sym];
+        const btn = document.createElement('button');
+        btn.className = `atom-btn p-2 rounded-lg border flex flex-col items-center justify-center relative cursor-pointer ${
+          sym === activeElement 
+            ? 'bg-indigo-600/30 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' 
+            : 'bg-slate-800/60 border-slate-700/80 text-slate-300 hover:bg-slate-700'
+        }`;
+        btn.onclick = () => selectElement(sym);
+
+        btn.innerHTML = `
+          <span class="w-3 h-3 rounded-full absolute top-1.5 left-1.5 border border-white/20" style="background-color: ${el.color}"></span>
+          <span class="text-sm font-bold mt-1">${el.symbol}</span>
+          <span class="text-[9px] text-slate-400 font-mono">${el.valE}e⁻</span>
+        `;
+        return btn;
+      };
+
+      nonMetalSymbols.forEach(sym => nonMetalsGrid.appendChild(createButton(sym)));
+      expandedSymbols.forEach(sym => expandedGrid.appendChild(createButton(sym)));
+    }
+
+    function selectElement(sym) {
+      activeElement = sym;
+      const el = ELEMENTS[sym];
+      
+      document.getElementById('activeAtomBadge').style.backgroundColor = el.color;
+      document.getElementById('activeAtomBadge').style.color = (sym === 'H' || sym === 'S' || sym === 'Be') ? '#000' : '#fff';
+      document.getElementById('activeAtomBadge').innerText = el.symbol;
+      document.getElementById('activeAtomName').innerText = el.name;
+      document.getElementById('activeAtomInfo').innerText = `Valence: ${el.valE} e⁻ | Max Octet: ${el.maxOctet}`;
+      document.getElementById('activeAtomEN').innerText = el.en.toFixed(2);
+
+      populateElementPalette(); // Re-render highlights
+      if (currentTool !== 'add') setTool('add');
+    }
+
+    function setTool(tool) {
+      currentTool = tool;
+      document.getElementById('toolAddBtn').className = tool === 'add' 
+        ? 'p-2 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 bg-indigo-600/30 border-indigo-500 text-indigo-200'
+        : 'p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-medium flex items-center justify-center gap-2';
+      
+      document.getElementById('toolBondBtn').className = tool === 'bond' 
+        ? 'p-2 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 bg-indigo-600/30 border-indigo-500 text-indigo-200'
+        : 'p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-medium flex items-center justify-center gap-2';
+
+      document.getElementById('toolDeleteBtn').className = tool === 'delete' 
+        ? 'p-2 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 bg-rose-600/30 border-rose-500 text-rose-200'
+        : 'p-2 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 text-xs font-medium flex items-center justify-center gap-2';
+    }
+
+    function toggleBondOrderMode() {
+      if (currentBondOrder === 1) currentBondOrder = 2;
+      else if (currentBondOrder === 2) currentBondOrder = 3;
+      else currentBondOrder = 1;
+
+      const labels = { 1: 'Single (1x)', 2: 'Double (2x)', 3: 'Triple (3x)' };
+      document.getElementById('currentBondOrderLabel').innerText = labels[currentBondOrder];
+    }
+
+    /* =========================================================================
+       3. 2D CANVAS INTERACTION ENGINE
+       ========================================================================= */
+    let canvas2D, ctx2D;
+
+    function init2DCanvas() {
+      const container = document.getElementById('container2D');
+      canvas2D = document.getElementById('canvas2D');
+      ctx2D = canvas2D.getContext('2d');
+
+      const resize = () => {
+        canvas2D.width = container.clientWidth;
+        canvas2D.height = container.clientHeight;
+        requestAnimationFrame(draw2D);
+      };
+
+      window.addEventListener('resize', resize);
+      resize();
+
+      // Canvas Event Listeners
+      canvas2D.addEventListener('mousedown', onMouseDown2D);
+      canvas2D.addEventListener('mousemove', onMouseMove2D);
+      canvas2D.addEventListener('mouseup', onMouseUp2D);
+    }
+
+    function onMouseDown2D(e) {
+      const rect = canvas2D.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const clickedNode = findNodeAt(x, y);
+
+      if (currentTool === 'delete') {
+        if (clickedNode) {
+          deleteNode(clickedNode.id);
+        } else {
+          const clickedLink = findLinkAt(x, y);
+          if (clickedLink) deleteLink(clickedLink.id);
+        }
+        processStructureAndValidate();
+        return;
+      }
+
+      if (currentTool === 'add') {
+        if (!clickedNode) {
+          const id = 'node_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+          nodes.push({
+            id,
+            element: activeElement,
+            x, y,
+            lonePairs: 0
+          });
+          autoAddLonePairsForNode(nodes[nodes.length - 1]);
+          processStructureAndValidate();
+        } else {
+          draggingNodeId = clickedNode.id;
+          dragOffset = { x: x - clickedNode.x, y: y - clickedNode.y };
+        }
+      } else if (currentTool === 'bond') {
+        if (clickedNode) {
+          bondStartNodeId = clickedNode.id;
+        }
+      }
+      requestAnimationFrame(draw2D);
+    }
+
+    function onMouseMove2D(e) {
+      const rect = canvas2D.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      hoveredNodeId = findNodeAt(x, y)?.id || null;
+
+      if (draggingNodeId) {
+        const node = nodes.find(n => n.id === draggingNodeId);
+        if (node) {
+          node.x = x - dragOffset.x;
+          node.y = y - dragOffset.y;
+        }
+      }
+
+      requestAnimationFrame(draw2D);
+    }
+
+    function onMouseUp2D(e) {
+      const rect = canvas2D.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (currentTool === 'bond' && bondStartNodeId) {
+        const targetNode = findNodeAt(x, y);
+        if (targetNode && targetNode.id !== bondStartNodeId) {
+          addOrCycleBond(bondStartNodeId, targetNode.id);
+          processStructureAndValidate();
+        }
+      }
+
+      draggingNodeId = null;
+      bondStartNodeId = null;
+      requestAnimationFrame(draw2D);
+    }
+
+    function findNodeAt(x, y) {
+      return nodes.find(n => {
+        const dx = n.x - x;
+        const dy = n.y - y;
+        return Math.sqrt(dx * dx + dy * dy) <= 24;
+      });
+    }
+
+    function findLinkAt(x, y) {
+      return links.find(l => {
+        const source = nodes.find(n => n.id === l.source);
+        const target = nodes.find(n => n.id === l.target);
+        if (!source || !target) return false;
+
+        const dist = distToSegment({ x, y }, source, target);
+        return dist < 8;
+      });
+    }
+
+    function distToSegment(p, v, w) {
+      const l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
+      if (l2 === 0) return Math.sqrt((p.x - v.x)**2 + (p.y - v.y)**2);
+      let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.sqrt((p.x - (v.x + t * (w.x - v.x)))**2 + (p.y - (v.y + t * (w.y - v.y)))**2);
+    }
+
+    function addOrCycleBond(sourceId, targetId) {
+      const existing = links.find(l => 
+        (l.source === sourceId && l.target === targetId) ||
+        (l.source === targetId && l.target === sourceId)
+      );
+
+      if (existing) {
+        existing.order = (existing.order % 3) + 1;
+      } else {
+        links.push({
+          id: 'link_' + Date.now(),
+          source: sourceId,
+          target: targetId,
+          order: currentBondOrder
+        });
+      }
+    }
+
+    function deleteNode(id) {
+      nodes = nodes.filter(n => n.id !== id);
+      links = links.filter(l => l.source !== id && l.target !== id);
+    }
+
+    function deleteLink(id) {
+      links = links.filter(l => l.id !== id);
+    }
+
+    function draw2D() {
+      if (!ctx2D) return;
+      ctx2D.clearRect(0, 0, canvas2D.width, canvas2D.height);
+
+      // 1. Draw Links (Bonds)
+      links.forEach(l => {
+        const source = nodes.find(n => n.id === l.source);
+        const target = nodes.find(n => n.id === l.target);
+        if (!source || !target) return;
+
+        const dx = target.x - source.x;
+        const dy = target.y - source.y;
+        const angle = Math.atan2(dy, dx);
+        const normX = -Math.sin(angle);
+        const normY = Math.cos(angle);
+
+        const offset = 6;
+        ctx2D.strokeStyle = '#94a3b8';
+        ctx2D.lineWidth = 3;
+
+        if (l.order === 1) {
+          drawLine(source.x, source.y, target.x, target.y);
+        } else if (l.order === 2) {
+          drawLine(source.x + normX * offset, source.y + normY * offset, target.x + normX * offset, target.y + normY * offset);
+          drawLine(source.x - normX * offset, source.y - normY * offset, target.x - normX * offset, target.y - normY * offset);
+        } else if (l.order === 3) {
+          drawLine(source.x, source.y, target.x, target.y);
+          drawLine(source.x + normX * offset * 1.5, source.y + normY * offset * 1.5, target.x + normX * offset * 1.5, target.y + normY * offset * 1.5);
+          drawLine(source.x - normX * offset * 1.5, source.y - normY * offset * 1.5, target.x - normX * offset * 1.5, target.y - normY * offset * 1.5);
+        }
+      });
+
+      // Draw temporary drag line for bonding
+      if (currentTool === 'bond' && bondStartNodeId) {
+        const startNode = nodes.find(n => n.id === bondStartNodeId);
+        if (startNode) {
+          ctx2D.strokeStyle = '#6366f1';
+          ctx2D.setLineDash([4, 4]);
+          ctx2D.lineWidth = 2;
+          drawLine(startNode.x, startNode.y, mousePos.x || startNode.x, mousePos.y || startNode.y);
+          ctx2D.setLineDash([]);
+        }
+      }
+
+      // 2. Draw Nodes (Atoms)
+      nodes.forEach(n => {
+        const el = ELEMENTS[n.element] || ELEMENTS.C;
+        const radius = 22;
+
+        // Outer glow on hover
+        if (n.id === hoveredNodeId) {
+          ctx2D.beginPath();
+          ctx2D.arc(n.x, n.y, radius + 5, 0, Math.PI * 2);
+          ctx2D.fillStyle = 'rgba(99, 102, 241, 0.25)';
+          ctx2D.fill();
+        }
+
+        // Atom circle
+        ctx2D.beginPath();
+        ctx2D.arc(n.x, n.y, radius, 0, Math.PI * 2);
+        ctx2D.fillStyle = el.color;
+        ctx2D.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx2D.shadowBlur = 8;
+        ctx2D.fill();
+        ctx2D.shadowBlur = 0;
+
+        ctx2D.lineWidth = 2;
+        ctx2D.strokeStyle = n.id === selectedNodeId ? '#818cf8' : '#334155';
+        ctx2D.stroke();
+
+        // Symbol Label
+        ctx2D.fillStyle = (n.element === 'H' || n.element === 'S' || n.element === 'Be') ? '#0f172a' : '#ffffff';
+        ctx2D.font = 'bold 14px sans-serif';
+        ctx2D.textAlign = 'center';
+        ctx2D.textBaseline = 'middle';
+        ctx2D.fillText(n.element, n.x, n.y);
+
+        // Draw Lone Pairs around atom
+        drawLonePairs2D(n);
+      });
+    }
+
+    let mousePos = { x: 0, y: 0 };
+    canvas2D?.addEventListener('mousemove', e => {
+      const rect = canvas2D.getBoundingClientRect();
+      mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    });
+
+    function drawLine(x1, y1, x2, y2) {
+      ctx2D.beginPath();
+      ctx2D.moveTo(x1, y1);
+      ctx2D.lineTo(x2, y2);
+      ctx2D.stroke();
+    }
+
+    function drawLonePairs2D(node) {
+      const lpCount = node.lonePairs || 0;
+      if (lpCount <= 0) return;
+
+      const angles = [ -Math.PI/2, Math.PI/2, 0, Math.PI ];
+      for (let i = 0; i < Math.min(lpCount, 4); i++) {
+        const a = angles[i];
+        const dist = 30;
+        const pairOffset = 5;
+
+        const cx = node.x + Math.cos(a) * dist;
+        const cy = node.y + Math.sin(a) * dist;
+
+        const px = -Math.sin(a) * pairOffset;
+        const py = Math.cos(a) * pairOffset;
+
+        ctx2D.fillStyle = '#f59e0b'; // Amber electron pair
+        ctx2D.beginPath();
+        ctx2D.arc(cx + px, cy + py, 2.5, 0, Math.PI * 2);
+        ctx2D.arc(cx - px, cy - py, 2.5, 0, Math.PI * 2);
+        ctx2D.fill();
+      }
+    }
+
+    /* =========================================================================
+       4. CHEMICAL PARSER & VSEPR VALIDATION ENGINE
+       ========================================================================= */
+
+    function autoAddLonePairs() {
+      nodes.forEach(autoAddLonePairsForNode);
+      processStructureAndValidate();
+    }
+
+    function autoAddLonePairsForNode(node) {
+      const el = ELEMENTS[node.element];
+      if (!el) return;
+
+      // Count bonded electrons
+      const connectedLinks = links.filter(l => l.source === node.id || l.target === node.id);
+      const sharedE = connectedLinks.reduce((sum, l) => sum + l.order, 0);
+
+      // Remaining non-bonding valence electrons
+      const totalValence = el.valE;
+      let remaining = totalValence - sharedE;
+      
+      // Target octet or standard valence
+      let targetE = el.maxOctet;
+      if (node.element === 'H') targetE = 2;
+      if (node.element === 'B') targetE = 6;
+      if (node.element === 'Be') targetE = 4;
+
+      let neededLP = Math.floor((targetE - sharedE * 2) / 2);
+      node.lonePairs = Math.max(0, neededLP);
+    }
+
+    function processStructureAndValidate() {
+      const validation = validateChemicalStructure();
+
+      if (!validation.isValid) {
+        showErrorAlert(validation.title, validation.message);
+        document.getElementById('validityBadge').innerText = 'Rule Violation';
+        document.getElementById('validityBadge').className = 'text-[10px] bg-rose-500/20 text-rose-400 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold';
+      } else {
+        dismissError();
+        document.getElementById('validityBadge').innerText = 'Valid VSEPR';
+        document.getElementById('validityBadge').className = 'text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold';
+        
+        const summary = analyzeVSEPR();
+        updatePropertiesPanel(summary);
+
+        if (activeView === '3d') {
+          render3DMolecule(summary);
+        }
+      }
+      requestAnimationFrame(draw2D);
+    }
+
+    function validateChemicalStructure() {
+      if (nodes.length === 0) {
+        return { isValid: false, title: "Empty Canvas", message: "Place at least one atom onto the canvas workspace." };
+      }
+
+      // Check disconnected components
+      if (nodes.length > 1 && links.length === 0) {
+        return { isValid: false, title: "Unbound Isolated Atoms", message: "Connect atoms with bonds using the 'Create Bond' tool to build a molecule." };
+      }
+
+      // Individual Atom Valence & Octet Rules Check
+      for (const node of nodes) {
+        const el = ELEMENTS[node.element];
+        const connectedLinks = links.filter(l => l.source === node.id || l.target === node.id);
+        const bondCount = connectedLinks.reduce((sum, l) => sum + l.order, 0);
+        const lonePairE = (node.lonePairs || 0) * 2;
+        const totalElectronsAroundAtom = (bondCount * 2) + lonePairE;
+
+        // Rule 1: Hydrogen Duet Rule (Max 1 bond, 2 electrons)
+        if (node.element === 'H' && bondCount > 1) {
+          return {
+            isValid: false,
+            title: "Hydrogen Duet Rule Violation",
+            message: `Hydrogen atom (H) cannot form ${bondCount} bonds. Hydrogen only possesses a 1s orbital and follows the duet rule (maximum 1 single bond, 2 shared electrons).`
+          };
+        }
+
+        // Rule 2: Period 2 Strict Octet Rule Violation (C, N, O, F cannot expand octet)
+        if (el.period === 2 && totalElectronsAroundAtom > 8) {
+          return {
+            isValid: false,
+            title: "Strict Octet Rule Violation (Period 2 Element)",
+            message: `${el.name} (${el.symbol}) has ${totalElectronsAroundAtom} outer shell valence electrons in this structure. Second-period elements lack accessible d-orbitals and CANNOT expand their valence shell beyond 8 electrons.`
+          };
+        }
+
+        // Rule 3: Expanded Octet Limit Check (Period 3+ like P, S, Cl, Xe max 12 or 14 electrons)
+        if (totalElectronsAroundAtom > el.maxOctet) {
+          return {
+            isValid: false,
+            title: "Valence Shell Capacity Exceeded",
+            message: `${el.name} (${el.symbol}) is configured with ${totalElectronsAroundAtom} electrons. Its maximum stable valence shell limit is ${el.maxOctet} electrons.`
+          };
+        }
+
+        // Rule 4: Halogen terminal multiple bonds without charge
+        if (['F', 'Cl', 'Br', 'I'].includes(node.element) && bondCount > 3) {
+          return {
+            isValid: false,
+            title: "Unfavorable Halogen Bonding",
+            message: `Halogen atom ${node.element} has ${bondCount} bonds, which forms an unstable high energy electron configuration.`
+          };
+        }
+      }
+
+      return { isValid: true };
+    }
+
+    function showErrorAlert(title, message) {
+      document.getElementById('errorTitle').innerText = title;
+      document.getElementById('errorMessage').innerText = message;
+      document.getElementById('errorAlertBox').classList.remove('hidden');
+    }
+
+    function dismissError() {
+      document.getElementById('errorAlertBox').classList.add('hidden');
+    }
+
+    function autoFixStructure() {
+      autoAddLonePairs();
+      dismissError();
+    }
+
+    /* =========================================================================
+       5. VSEPR ANALYSIS & MOLECULAR GEOMETRY COMPUTATION
+       ========================================================================= */
+    function analyzeVSEPR() {
+      if (nodes.length === 0) return null;
+
+      // Identify central atom (atom with highest connectivity or non-H)
+      let centralNode = nodes.reduce((max, node) => {
+        const connCount = links.filter(l => l.source === node.id || l.target === node.id).length;
+        const maxConn = links.filter(l => l.source === max.id || l.target === max.id).length;
+        if (connCount > maxConn) return node;
+        if (connCount === maxConn && node.element !== 'H' && max.element === 'H') return node;
+        return max;
+      }, nodes[0]);
+
+      const connectedLinks = links.filter(l => l.source === centralNode.id || l.target === centralNode.id);
+      const X = connectedLinks.length; // Number of bonded atoms
+      const E = centralNode.lonePairs || 0; // Number of lone pairs
+      const SN = X + E; // Steric Number
+
+      const axeClass = `AX${X}${E > 0 ? 'E' + E : ''}`;
+
+      // Geometry mappings according to VSEPR theory
+      let geomInfo = {
+        name: 'Linear',
+        electronGeom: 'Linear',
+        hybridization: 'sp',
+        idealAngle: '180°',
+        actualAngle: '180°',
+        polarity: 'Non-polar'
+      };
+
+      if (SN === 2) {
+        geomInfo = { name: 'Linear', electronGeom: 'Linear', hybridization: 'sp', idealAngle: '180°', actualAngle: '180°' };
+      } else if (SN === 3) {
+        if (E === 0) geomInfo = { name: 'Trigonal Planar', electronGeom: 'Trigonal Planar', hybridization: 'sp²', idealAngle: '120°', actualAngle: '120°' };
+        if (E === 1) geomInfo = { name: 'Bent (V-Shaped)', electronGeom: 'Trigonal Planar', hybridization: 'sp²', idealAngle: '120°', actualAngle: '~118°' };
+      } else if (SN === 4) {
+        if (E === 0) geomInfo = { name: 'Tetrahedral', electronGeom: 'Tetrahedral', hybridization: 'sp³', idealAngle: '109.5°', actualAngle: '109.5°' };
+        if (E === 1) geomInfo = { name: 'Trigonal Pyramidal', electronGeom: 'Tetrahedral', hybridization: 'sp³', idealAngle: '109.5°', actualAngle: '~107°' };
+        if (E === 2) geomInfo = { name: 'Bent (V-Shaped)', electronGeom: 'Tetrahedral', hybridization: 'sp³', idealAngle: '109.5°', actualAngle: '104.5°' };
+      } else if (SN === 5) {
+        if (E === 0) geomInfo = { name: 'Trigonal Bipyramidal', electronGeom: 'Trigonal Bipyramidal', hybridization: 'sp³d', idealAngle: '90° / 120°', actualAngle: '90° / 120°' };
+        if (E === 1) geomInfo = { name: 'Seesaw', electronGeom: 'Trigonal Bipyramidal', hybridization: 'sp³d', idealAngle: '90° / 120°', actualAngle: '< 90° / < 120°' };
+        if (E === 2) geomInfo = { name: 'T-Shaped', electronGeom: 'Trigonal Bipyramidal', hybridization: 'sp³d', idealAngle: '90°', actualAngle: '~87.5°' };
+        if (E === 3) geomInfo = { name: 'Linear', electronGeom: 'Trigonal Bipyramidal', hybridization: 'sp³d', idealAngle: '180°', actualAngle: '180°' };
+      } else if (SN === 6) {
+        if (E === 0) geomInfo = { name: 'Octahedral', electronGeom: 'Octahedral', hybridization: 'sp³d²', idealAngle: '90°', actualAngle: '90°' };
+        if (E === 1) geomInfo = { name: 'Square Pyramidal', electronGeom: 'Octahedral', hybridization: 'sp³d²', idealAngle: '90°', actualAngle: '< 90°' };
+        if (E === 2) geomInfo = { name: 'Square Planar', electronGeom: 'Octahedral', hybridization: 'sp³d²', idealAngle: '90°', actualAngle: '90°' };
+      }
+
+      // Calculate Chemical Formula
+      const counts = {};
+      nodes.forEach(n => counts[n.element] = (counts[n.element] || 0) + 1);
+      
+      let formulaStr = '';
+      if (counts['C']) {
+        formulaStr += `C${counts['C'] > 1 ? counts['C'] : ''}`;
+        delete counts['C'];
+        if (counts['H']) {
+          formulaStr += `H${counts['H'] > 1 ? counts['H'] : ''}`;
+          delete counts['H'];
+        }
+      }
+      Object.keys(counts).sort().forEach(sym => {
+        formulaStr += `${sym}${counts[sym] > 1 ? counts[sym] : ''}`;
+      });
+
+      // Molar Mass
+      const mass = nodes.reduce((sum, n) => sum + (ATOMIC_MASSES[n.element] || 12.01), 0);
+
+      // Polarity Estimation
+      let isPolar = false;
+      if (E > 0 && !['XeF4', 'CO2'].includes(formulaStr)) isPolar = true;
+      const enValues = nodes.map(n => ELEMENTS[n.element].en);
+      const enDiff = Math.max(...enValues) - Math.min(...enValues);
+      if (enDiff > 0.4 && (E > 0 || ['H2O', 'NH3', 'HCN', 'SO2'].includes(formulaStr))) isPolar = true;
+
+      return {
+        centralNode,
+        stericNumber: SN,
+        bondedCount: X,
+        lonePairCount: E,
+        axeClass,
+        geomInfo,
+        formula: formulaStr,
+        molarMass: mass.toFixed(3),
+        isPolar
+      };
+    }
+
+    function updatePropertiesPanel(summary) {
+      if (!summary) return;
+
+      document.getElementById('propFormula').innerHTML = formatFormulaHTML(summary.formula);
+      document.getElementById('propIUPAC').innerText = getMoleculeIUPAC(summary.formula);
+      document.getElementById('propAXE').innerText = summary.axeClass;
+      document.getElementById('propSteric').innerText = summary.stericNumber;
+      document.getElementById('propGeometry').innerText = summary.geomInfo.name;
+      document.getElementById('propElectronGeom').innerText = summary.geomInfo.electronGeom;
+      document.getElementById('propHybrid').innerText = summary.geomInfo.hybridization;
+      document.getElementById('propIdealAngle').innerText = summary.geomInfo.idealAngle;
+      document.getElementById('propActualAngle').innerText = summary.geomInfo.actualAngle;
+      document.getElementById('propMass').innerText = `${summary.molarMass} g/mol`;
+      
+      document.getElementById('propPolarity').innerText = summary.isPolar ? 'Polar (Dipole > 0)' : 'Non-Polar (Symmetric)';
+      document.getElementById('propPolarity').className = summary.isPolar ? 'font-semibold text-amber-400' : 'font-semibold text-emerald-400';
+
+      // Render Bond Metrics Table
+      const metricsTable = document.getElementById('bondMetricsTable');
+      metricsTable.innerHTML = '';
+
+      links.forEach(l => {
+        const source = nodes.find(n => n.id === l.source);
+        const target = nodes.find(n => n.id === l.target);
+        if (!source || !target) return;
+
+        const el1 = ELEMENTS[source.element];
+        const el2 = ELEMENTS[target.element];
+        const avgRadius = (el1.radius + el2.radius) * (l.order === 1 ? 1.0 : l.order === 2 ? 0.86 : 0.78);
+        const lengthAngstrom = avgRadius.toFixed(2);
+        const lengthPm = Math.round(avgRadius * 100);
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-800/40';
+        tr.innerHTML = `
+          <td class="p-2 font-bold text-slate-200">${source.element} – ${target.element}</td>
+          <td class="p-2 text-indigo-400 font-semibold">${l.order === 1 ? 'Single' : l.order === 2 ? 'Double' : 'Triple'} (${l.order})</td>
+          <td class="p-2 text-slate-300">${lengthAngstrom} Å</td>
+          <td class="p-2 text-slate-300">${lengthPm} pm</td>
+        `;
+        metricsTable.appendChild(tr);
+      });
+
+      // Formal Charges Calculation
+      const fcList = document.getElementById('formalChargeList');
+      fcList.innerHTML = '';
+      
+      nodes.forEach(n => {
+        const el = ELEMENTS[n.element];
+        const connectedLinks = links.filter(l => l.source === n.id || l.target === n.id);
+        const bondE = connectedLinks.reduce((sum, l) => sum + l.order, 0);
+        const nonBondE = (n.lonePairs || 0) * 2;
+        const fc = el.valE - nonBondE - bondE;
+
+        const fcItem = document.createElement('div');
+        fcItem.className = 'flex justify-between items-center py-0.5 border-b border-slate-800/40';
+        fcItem.innerHTML = `
+          <span class="text-slate-300">${el.name} (${n.element}):</span>
+          <span class="font-bold ${fc === 0 ? 'text-slate-400' : fc > 0 ? 'text-rose-400' : 'text-indigo-400'}">
+            ${fc > 0 ? '+' + fc : fc}
+          </span>
+        `;
+        fcList.appendChild(fcItem);
+      });
+    }
+
+    function formatFormulaHTML(formula) {
+      return formula.replace(/(\d+)/g, '<sub>$1</sub>');
+    }
+
+    function getMoleculeIUPAC(formula) {
+      const iupacMap = {
+        'H2O': 'Water (Oxidane)',
+        'CO2': 'Carbon Dioxide',
+        'CH4': 'Methane',
+        'NH3': 'Ammonia (Azane)',
+        'BF3': 'Boron Trifluoride',
+        'PCl5': 'Phosphorus Pentachloride',
+        'SF6': 'Sulfur Hexafluoride',
+        'SF4': 'Sulfur Tetrafluoride',
+        'XeF4': 'Xenon Tetrafluoride',
+        'SO2': 'Sulfur Dioxide',
+        'HCN': 'Hydrogen Cyanide',
+        'C2H4': 'Ethene (Ethylene)'
+      };
+      return iupacMap[formula] || 'Custom Molecular Compound';
+    }
+
+    /* =========================================================================
+       6. 3D VSEPR MOLECULAR THREE.JS ENGINE
+       ========================================================================= */
+    function init3DScene() {
+      if (is3DInitialized) return;
+      const container = document.getElementById('container3D');
+      const canvas = document.getElementById('canvas3D');
+
+      scene3D = new THREE.Scene();
+      scene3D.background = new THREE.Color(0x020617); // Slate 950
+
+      camera3D = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera3D.position.set(0, 0, 12);
+
+      renderer3D = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer3D.setSize(container.clientWidth, container.clientHeight);
+      renderer3D.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      controls3D = new THREE.OrbitControls(camera3D, renderer3D.domElement);
+      controls3D.enableDamping = true;
+      controls3D.dampingFactor = 0.05;
+      controls3D.autoRotate = true;
+      controls3D.autoRotateSpeed = 2.0;
+
+      // Lighting Setup
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene3D.add(ambientLight);
+
+      const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight1.position.set(10, 15, 10);
+      scene3D.add(dirLight1);
+
+      const dirLight2 = new THREE.DirectionalLight(0x818cf8, 0.4);
+      dirLight2.position.set(-10, -10, -10);
+      scene3D.add(dirLight2);
+
+      window.addEventListener('resize', () => {
+        if (!container.clientWidth) return;
+        camera3D.aspect = container.clientWidth / container.clientHeight;
+        camera3D.updateProjectionMatrix();
+        renderer3D.setSize(container.clientWidth, container.clientHeight);
+      });
+
+      is3DInitialized = true;
+      animate3D();
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      if (controls3D) controls3D.update();
+      if (renderer3D && scene3D && camera3D) {
+        renderer3D.render(scene3D, camera3D);
+      }
+    }
+
+    function render3DMolecule(summary) {
+      if (!is3DInitialized) init3DScene();
+
+      // Clear previous 3D object groups
+      if (molecularGroup3D) scene3D.remove(molecularGroup3D);
+
+      molecularGroup3D = new THREE.Group();
+      lonePairGroup3D = new THREE.Group();
+      bondLabelsGroup3D = new THREE.Group();
+      molecularGroup3D.add(lonePairGroup3D);
+      molecularGroup3D.add(bondLabelsGroup3D);
+
+      if (!summary || nodes.length === 0) return;
+
+      const central = summary.centralNode;
+      const connected = links.filter(l => l.source === central.id || l.target === central.id);
+
+      // Compute VSEPR 3D positional directions
+      const directionVectors = getVSEPRDirections(summary.bondedCount, summary.lonePairCount);
+
+      // 1. Central Atom Sphere
+      const centralEl = ELEMENTS[central.element];
+      const centralMesh = createAtomSphere(centralEl, true);
+      centralMesh.position.set(0, 0, 0);
+      molecularGroup3D.add(centralMesh);
+
+      // 2. Render Outer Bonded Atoms along VSEPR directions
+      let bondedIdx = 0;
+      let lonePairIdx = 0;
+
+      const bondDist = 2.8;
+
+      connected.forEach((link, idx) => {
+        const otherNodeId = link.source === central.id ? link.target : link.source;
+        const otherNode = nodes.find(n => n.id === otherNodeId);
+        if (!otherNode) return;
+
+        const dir = directionVectors.bonded[bondedIdx] || new THREE.Vector3(1, 0, 0);
+        bondedIdx++;
+
+        const pos = dir.clone().multiplyScalar(bondDist);
+
+        // Outer Atom Sphere
+        const outerEl = ELEMENTS[otherNode.element];
+        const outerMesh = createAtomSphere(outerEl, false);
+        outerMesh.position.copy(pos);
+        molecularGroup3D.add(outerMesh);
+
+        // Render Bond Cylinders (Single, Double, Triple)
+        create3DBondCylinders(new THREE.Vector3(0,0,0), pos, link.order, molecularGroup3D);
+      });
+
+      // 3. Render Translucent Lone Pair Electron Clouds
+      if (directionVectors.lonePairs) {
+        directionVectors.lonePairs.forEach(dir => {
+          const lpMesh = create3DLonePairLobe(dir.clone().multiplyScalar(1.8));
+          lonePairGroup3D.add(lpMesh);
+        });
+      }
+
+      scene3D.add(molecularGroup3D);
+    }
+
+    function createAtomSphere(elementData, isCentral) {
+      const radius = (elementData.radius || 0.8) * (isCentral ? 1.1 : 0.9);
+      const geometry = new THREE.SphereGeometry(radius, 32, 32);
+      const material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(elementData.color),
+        roughness: 0.2,
+        metalness: 0.1
+      });
+      return new THREE.Mesh(geometry, material);
+    }
+
+    function create3DBondCylinders(startPos, endPos, order, parentGroup) {
+      const dir = new THREE.Vector3().subVectors(endPos, startPos);
+      const len = dir.length();
+      const midPos = new THREE.Vector3().addVectors(startPos, endPos).multiplyScalar(0.5);
+
+      const perp = new THREE.Vector3(0, 1, 0);
+      if (Math.abs(dir.clone().normalize().dot(perp)) > 0.9) {
+        perp.set(1, 0, 0);
+      }
+      const offsetVec = new THREE.Vector3().crossVectors(dir, perp).normalize().multiplyScalar(0.18);
+
+      const createCylinder = (posOffset) => {
+        const geom = new THREE.CylinderGeometry(0.1, 0.1, len, 16);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xc084fc, roughness: 0.3 }); // Purple highlight bond
+        const mesh = new THREE.Mesh(geom, mat);
+
+        mesh.position.copy(midPos).add(posOffset);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+        return mesh;
+      };
+
+      if (order === 1) {
+        parentGroup.add(createCylinder(new THREE.Vector3(0,0,0)));
+      } else if (order === 2) {
+        parentGroup.add(createCylinder(offsetVec));
+        parentGroup.add(createCylinder(offsetVec.clone().negate()));
+      } else if (order === 3) {
+        parentGroup.add(createCylinder(new THREE.Vector3(0,0,0)));
+        parentGroup.add(createCylinder(offsetVec));
+        parentGroup.add(createCylinder(offsetVec.clone().negate()));
+      }
+    }
+
+    function create3DLonePairLobe(pos) {
+      const geom = new THREE.SphereGeometry(0.6, 24, 24);
+      geom.scale(1, 1.4, 1);
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0xf59e0b,
+        transparent: true,
+        opacity: 0.55,
+        wireframe: false
+      });
+      const mesh = new THREE.Mesh(geom, mat);
+      mesh.position.copy(pos);
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pos.clone().normalize());
+      return mesh;
+    }
+
+    function getVSEPRDirections(X, E) {
+      const SN = X + E;
+      const bondedDirs = [];
+      const loneDirs = [];
+
+      if (SN === 2) {
+        // Linear
+        const all = [new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0)];
+        return { bonded: all.slice(0, X), lonePairs: all.slice(X) };
+      }
+
+      if (SN === 3) {
+        // Trigonal Planar (120 deg in XY)
+        const all = [
+          new THREE.Vector3(0, 1, 0),
+          new THREE.Vector3(Math.cos(-Math.PI/6), Math.sin(-Math.PI/6), 0),
+          new THREE.Vector3(-Math.cos(-Math.PI/6), Math.sin(-Math.PI/6), 0)
+        ];
+        return { bonded: all.slice(0, X), lonePairs: all.slice(X) };
+      }
+
+      if (SN === 4) {
+        // Tetrahedral (109.5 deg)
+        const all = [
+          new THREE.Vector3(0, 1, 0),
+          new THREE.Vector3(2 * Math.sqrt(2)/3, -1/3, 0),
+          new THREE.Vector3(-Math.sqrt(2)/3, -1/3, Math.sqrt(6)/3),
+          new THREE.Vector3(-Math.sqrt(2)/3, -1/3, -Math.sqrt(6)/3)
+        ];
+        return { bonded: all.slice(0, X), lonePairs: all.slice(X) };
+      }
+
+      if (SN === 5) {
+        // Trigonal Bipyramidal: Axial (2), Equatorial (3)
+        const eq = [
+          new THREE.Vector3(1, 0, 0),
+          new THREE.Vector3(Math.cos(2*Math.PI/3), Math.sin(2*Math.PI/3), 0),
+          new THREE.Vector3(Math.cos(4*Math.PI/3), Math.sin(4*Math.PI/3), 0)
+        ];
+        const ax = [
+          new THREE.Vector3(0, 0, 1),
+          new THREE.Vector3(0, 0, -1)
+        ];
+
+        // Lone pairs prefer equatorial positions first in TBP!
+        if (E === 0) return { bonded: [...ax, ...eq], lonePairs: [] };
+        if (E === 1) return { bonded: [...ax, eq[0], eq[1]], lonePairs: [eq[2]] }; // Seesaw
+        if (E === 2) return { bonded: [...ax, eq[0]], lonePairs: [eq[1], eq[2]] }; // T-Shaped
+        if (E === 3) return { bonded: [...ax], lonePairs: eq }; // Linear
+      }
+
+      if (SN === 6) {
+        // Octahedral
+        const all = [
+          new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
+          new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+          new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0)
+        ];
+
+        if (E === 0) return { bonded: all, lonePairs: [] };
+        if (E === 1) return { bonded: all.slice(0, 5), lonePairs: [all[5]] }; // Square Pyramidal
+        if (E === 2) return { bonded: [all[2], all[3], all[4], all[5]], lonePairs: [all[0], all[1]] }; // Square Planar
+      }
+
+      // Default layout generator fallback
+      for (let i = 0; i < X; i++) {
+        const phi = Math.acos(-1 + (2 * i) / Math.max(1, X));
+        const theta = Math.sqrt(X * Math.PI) * phi;
+        bondedDirs.push(new THREE.Vector3(Math.cos(theta)*Math.sin(phi), Math.sin(theta)*Math.sin(phi), Math.cos(phi)));
+      }
+      return { bonded: bondedDirs, lonePairs: [] };
+    }
+
+    /* =========================================================================
+       7. VIEW TOGGLES & PRESET MOLECULE LOADERS
+       ========================================================================= */
+    function switchView(view) {
+      activeView = view;
+      const c2D = document.getElementById('container2D');
+      const c3D = document.getElementById('container3D');
+      const btn2D = document.getElementById('view2dBtn');
+      const btn3D = document.getElementById('view3dBtn');
+
+      if (view === '2d') {
+        c2D.classList.remove('hidden');
+        c3D.classList.add('hidden');
+        btn2D.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-indigo-600 text-white shadow';
+        btn3D.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-700';
+      } else {
+        c2D.classList.add('hidden');
+        c3D.classList.remove('hidden');
+        btn3D.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 bg-indigo-600 text-white shadow';
+        btn2D.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-700';
+
+        const summary = analyzeVSEPR();
+        render3DMolecule(summary);
+      }
+    }
+
+    function toggleAutoRotate(val) {
+      if (controls3D) controls3D.autoRotate = val;
+    }
+
+    function toggleLonePairs3D(val) {
+      if (lonePairGroup3D) lonePairGroup3D.visible = val;
+    }
+
+    function toggleBondLabels3D(val) {
+      if (bondLabelsGroup3D) bondLabelsGroup3D.visible = val;
+    }
+
+    function clearWorkspace() {
+      nodes = [];
+      links = [];
+      document.getElementById('presetSelect').value = '';
+      processStructureAndValidate();
+    }
+
+    function autoLayout2D() {
+      if (nodes.length === 0) return;
+      const centerX = canvas2D.width / 2;
+      const centerY = canvas2D.height / 2;
+
+      if (nodes.length === 1) {
+        nodes[0].x = centerX;
+        nodes[0].y = centerY;
+      } else {
+        const central = nodes[0];
+        central.x = centerX;
+        central.y = centerY;
+
+        const others = nodes.slice(1);
+        const radius = 120;
+        others.forEach((n, i) => {
+          const angle = (i * 2 * Math.PI) / others.length;
+          n.x = centerX + Math.cos(angle) * radius;
+          n.y = centerY + Math.sin(angle) * radius;
+        });
+      }
+      requestAnimationFrame(draw2D);
+    }
+
+    function loadPresetMolecule(type) {
+      if (!type) return;
+      clearWorkspace();
+
+      const cx = (canvas2D?.width || 600) / 2;
+      const cy = (canvas2D?.height || 400) / 2;
+
+      const buildPreset = (centerSym, outerSyms, bondOrders = [], lpCounts = []) => {
+        const cId = 'node_center';
+        nodes.push({ id: cId, element: centerSym, x: cx, y: cy, lonePairs: lpCounts[0] || 0 });
+
+        const radius = 110;
+        outerSyms.forEach((sym, i) => {
+          const angle = (i * 2 * Math.PI) / outerSyms.length - Math.PI/2;
+          const oId = `node_outer_${i}`;
+          nodes.push({
+            id: oId,
+            element: sym,
+            x: cx + Math.cos(angle) * radius,
+            y: cy + Math.sin(angle) * radius,
+            lonePairs: lpCounts[i + 1] || (sym === 'H' ? 0 : 3)
+          });
+
+          links.push({
+            id: `link_${i}`,
+            source: cId,
+            target: oId,
+            order: bondOrders[i] || 1
+          });
+        });
+      };
+
+      if (type === 'H2O') {
+        buildPreset('O', ['H', 'H'], [1, 1], [2, 0, 0]);
+      } else if (type === 'CO2') {
+        buildPreset('C', ['O', 'O'], [2, 2], [0, 2, 2]);
+      } else if (type === 'CH4') {
+        buildPreset('C', ['H', 'H', 'H', 'H'], [1, 1, 1, 1], [0, 0, 0, 0, 0]);
+      } else if (type === 'NH3') {
+        buildPreset('N', ['H', 'H', 'H'], [1, 1, 1], [1, 0, 0, 0]);
+      } else if (type === 'BF3') {
+        buildPreset('B', ['F', 'F', 'F'], [1, 1, 1], [0, 3, 3, 3]);
+      } else if (type === 'PCl5') {
+        buildPreset('P', ['Cl', 'Cl', 'Cl', 'Cl', 'Cl'], [1, 1, 1, 1, 1], [0, 3, 3, 3, 3, 3]);
+      } else if (type === 'SF6') {
+        buildPreset('S', ['F', 'F', 'F', 'F', 'F', 'F'], [1, 1, 1, 1, 1, 1], [0, 3, 3, 3, 3, 3, 3]);
+      } else if (type === 'SF4') {
+        buildPreset('S', ['F', 'F', 'F', 'F'], [1, 1, 1, 1], [1, 3, 3, 3, 3]);
+      } else if (type === 'XeF4') {
+        buildPreset('Xe', ['F', 'F', 'F', 'F'], [1, 1, 1, 1], [2, 3, 3, 3, 3]);
+      } else if (type === 'SO2') {
+        buildPreset('S', ['O', 'O'], [2, 2], [1, 2, 2]);
+      } else if (type === 'HCN') {
+        nodes.push({ id: 'c', element: 'C', x: cx, y: cy, lonePairs: 0 });
+        nodes.push({ id: 'h', element: 'H', x: cx - 110, y: cy, lonePairs: 0 });
+        nodes.push({ id: 'n', element: 'N', x: cx + 110, y: cy, lonePairs: 1 });
+        links.push({ id: 'l1', source: 'c', target: 'h', order: 1 });
+        links.push({ id: 'l2', source: 'c', target: 'n', order: 3 });
+      } else if (type === 'C2H4') {
+        nodes.push({ id: 'c1', element: 'C', x: cx - 50, y: cy, lonePairs: 0 });
+        nodes.push({ id: 'c2', element: 'C', x: cx + 50, y: cy, lonePairs: 0 });
+        nodes.push({ id: 'h1', element: 'H', x: cx - 120, y: cy - 70, lonePairs: 0 });
+        nodes.push({ id: 'h2', element: 'H', x: cx - 120, y: cy + 70, lonePairs: 0 });
+        nodes.push({ id: 'h3', element: 'H', x: cx + 120, y: cy - 70, lonePairs: 0 });
+        nodes.push({ id: 'h4', element: 'H', x: cx + 120, y: cy + 70, lonePairs: 0 });
+        links.push({ id: 'l0', source: 'c1', target: 'c2', order: 2 });
+        links.push({ id: 'l1', source: 'c1', target: 'h1', order: 1 });
+        links.push({ id: 'l2', source: 'c1', target: 'h2', order: 1 });
+        links.push({ id: 'l3', source: 'c2', target: 'h3', order: 1 });
+        links.push({ id: 'l4', source: 'c2', target: 'h4', order: 1 });
+      }
+
+      processStructureAndValidate();
+    }
+  </script>
+</body>
+</html>
