@@ -1,0 +1,1410 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Electrochemistry Lab & Cell Simulator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 1); }
+    /* Glow animations */
+    .glow-cyan { filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.5)); }
+    .glow-amber { filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.6)); }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col overflow-x-hidden selection:bg-cyan-500 selection:text-slate-900">
+
+  <header class="h-16 border-b border-slate-800 glass-panel shrink-0 flex items-center justify-between px-4 md:px-6 z-20 sticky top-0">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+        <i class="fa-solid font-bold fa-bolt text-slate-950 text-xl"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg text-slate-100 flex items-center gap-2">
+          Electrochemistry Lab <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800/50">Galvanic & Nernst</span>
+        </h1>
+        <p class="text-xs text-slate-400 hidden sm:block">Interactive Electrochemical Cell & Microscopic Redox Simulator</p>
+      </div>
+    </div>
+
+    <!-- Quick Presets -->
+    <div class="flex items-center gap-2">
+      <div class="hidden lg:flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-lg border border-slate-800 text-xs">
+        <span class="text-slate-400 px-2 font-medium">Presets:</span>
+        <button onclick="loadPreset('daniell')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Daniell (Zn-Cu)</button>
+        <button onclick="loadPreset('silver_copper')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Cu-Ag Cell</button>
+        <button onclick="loadPreset('high_voltage')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">High Volt (Mg-Ag)</button>
+        <button onclick="loadPreset('concentration')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition">Concentration Cell</button>
+      </div>
+
+      <button onclick="toggleModal('info-modal')" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 text-sm flex items-center gap-1.5">
+        <i class="fa-solid fa-circle-info text-cyan-400"></i> <span class="hidden sm:inline">Guide</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 flex flex-col lg:flex-row overflow-hidden relative">
+
+    <!-- Left Controls Panel -->
+    <aside class="w-full lg:w-80 shrink-0 border-r border-slate-800 glass-panel flex flex-col overflow-y-auto max-h-[45vh] lg:max-h-none z-10">
+      <div class="p-4 border-b border-slate-800/60 bg-slate-900/40 flex items-center justify-between">
+        <h2 class="font-semibold text-sm uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+          <i class="fa-solid fa-sliders"></i> Cell Parameters
+        </h2>
+        <button onclick="resetCell()" class="text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1">
+          <i class="fa-solid fa-rotate-right"></i> Reset
+        </button>
+      </div>
+
+      <div class="p-4 space-y-5 flex-1">
+
+        <!-- Circuit Master Controls -->
+        <div class="bg-slate-900/90 rounded-xl p-3 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-300 uppercase">External Circuit</span>
+            <span id="circuit-status-badge" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">CONNECTED</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button id="switch-btn" onclick="toggleCircuit()" class="py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold text-xs flex items-center justify-center gap-2 shadow transition">
+              <i class="fa-solid fa-power-off"></i> <span id="switch-btn-text">Disconnect</span>
+            </button>
+            <button id="salt-bridge-btn" onclick="toggleSaltBridge()" class="py-2 px-3 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow transition">
+              <i class="fa-solid fa-bridge"></i> <span id="salt-bridge-text">Remove Bridge</span>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between pt-1">
+            <button onclick="swapElectrodes()" class="w-full py-1.5 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 flex items-center justify-center gap-2 transition">
+              <i class="fa-solid fa-arrow-right-arrow-left text-cyan-400"></i> Swap Electrode Positions
+            </button>
+          </div>
+        </div>
+
+        <!-- Left Half-Cell Setup -->
+        <div class="bg-slate-900/60 rounded-xl p-3.5 border border-slate-800/80 space-y-3 relative overflow-hidden">
+          <div class="absolute top-0 left-0 w-1 h-full bg-cyan-500"></div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-cyan-400 uppercase tracking-wide">Left Half-Cell (Electrode 1)</span>
+            <span id="left-role-tag" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">ANODE</span>
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Metal Electrode</label>
+            <select id="left-metal-select" onchange="updateCellSettings()" class="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs py-2 px-2.5 text-slate-200 focus:outline-none focus:border-cyan-500">
+              <!-- Options populated by JS -->
+            </select>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">Ion Concentration</span>
+              <span id="left-conc-val" class="font-mono text-cyan-400">1.00 M</span>
+            </div>
+            <input type="range" id="left-conc-slider" min="0.01" max="2.0" step="0.01" value="1.0" oninput="updateCellSettings()" class="w-full accent-cyan-500 cursor-pointer">
+          </div>
+
+          <div class="text-[11px] text-slate-400 bg-slate-950/50 p-2 rounded border border-slate-800/80 flex justify-between">
+            <span>Standard Reduction E°:</span>
+            <span id="left-standard-e" class="font-mono text-slate-200">-0.76 V</span>
+          </div>
+        </div>
+
+        <!-- Right Half-Cell Setup -->
+        <div class="bg-slate-900/60 rounded-xl p-3.5 border border-slate-800/80 space-y-3 relative overflow-hidden">
+          <div class="absolute top-0 left-0 w-1 h-full bg-orange-500"></div>
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-orange-400 uppercase tracking-wide">Right Half-Cell (Electrode 2)</span>
+            <span id="right-role-tag" class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-300">CATHODE</span>
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Metal Electrode</label>
+            <select id="right-metal-select" onchange="updateCellSettings()" class="w-full bg-slate-950 border border-slate-700 rounded-lg text-xs py-2 px-2.5 text-slate-200 focus:outline-none focus:border-cyan-500">
+              <!-- Options populated by JS -->
+            </select>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">Ion Concentration</span>
+              <span id="right-conc-val" class="font-mono text-orange-400">1.00 M</span>
+            </div>
+            <input type="range" id="right-conc-slider" min="0.01" max="2.0" step="0.01" value="1.0" oninput="updateCellSettings()" class="w-full accent-orange-500 cursor-pointer">
+          </div>
+
+          <div class="text-[11px] text-slate-400 bg-slate-950/50 p-2 rounded border border-slate-800/80 flex justify-between">
+            <span>Standard Reduction E°:</span>
+            <span id="right-standard-e" class="font-mono text-slate-200">+0.34 V</span>
+          </div>
+        </div>
+
+        <!-- Environmental & Load Controls -->
+        <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-300">Temperature & External Load</span>
+          </div>
+
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-400">Temperature</span>
+              <span id="temp-val" class="font-mono text-slate-200">25 °C (298.15 K)</span>
+            </div>
+            <input type="range" id="temp-slider" min="0" max="100" step="1" value="25" oninput="updateCellSettings()" class="w-full accent-slate-400 cursor-pointer">
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button id="mode-voltmeter-btn" onclick="setLoadMode('voltmeter')" class="py-1.5 px-2 rounded text-xs border border-cyan-500 bg-cyan-950/60 text-cyan-300 font-medium text-center">
+              <i class="fa-solid fa-gauge-high"></i> Voltmeter
+            </button>
+            <button id="mode-bulb-btn" onclick="setLoadMode('bulb')" class="py-1.5 px-2 rounded text-xs border border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200 font-medium text-center">
+              <i class="fa-regular fa-lightbulb"></i> Light Bulb
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Center Canvas Visualizer -->
+    <div class="flex-1 flex flex-col bg-slate-950 relative overflow-hidden">
+      <!-- Top Canvas Status Overlay -->
+      <div class="absolute top-3 left-4 right-4 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-2 backdrop-blur shadow-lg flex items-center gap-4 pointer-events-auto">
+          <div>
+            <div class="text-[10px] text-slate-400 font-semibold uppercase">Cell Potential (E_cell)</div>
+            <div id="live-voltage" class="text-xl md:text-2xl font-bold font-mono text-cyan-400 glow-cyan">+1.100 V</div>
+          </div>
+          <div class="h-8 w-px bg-slate-800"></div>
+          <div>
+            <div class="text-[10px] text-slate-400 font-semibold uppercase">Cell Type</div>
+            <div id="live-cell-type" class="text-xs font-semibold text-emerald-400">Galvanic (Spontaneous)</div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 pointer-events-auto">
+          <button onclick="toggleMicroscope()" id="microscope-toggle-btn" class="bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs text-slate-200 px-3 py-2 rounded-xl backdrop-blur flex items-center gap-2 shadow transition">
+            <i class="fa-solid fa-microscope text-cyan-400"></i>
+            <span id="microscope-btn-text">Show Atomic Inset</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Canvas Container -->
+      <div class="flex-1 w-full h-full relative" id="canvas-container">
+        <canvas id="cell-canvas" class="w-full h-full block"></canvas>
+      </div>
+
+      <!-- Floating Microscopic Zoom View Overlay -->
+      <div id="atomic-view-container" class="absolute bottom-4 right-4 w-72 md:w-80 bg-slate-900/95 border border-cyan-500/40 rounded-2xl p-3 shadow-2xl backdrop-blur z-10 hidden">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800">
+          <span class="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+            <i class="fa-solid fa-atom text-cyan-400"></i> Microscopic View (Interface)
+          </span>
+          <button onclick="toggleMicroscope()" class="text-slate-400 hover:text-slate-200 text-xs">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+        <div class="relative w-full h-40 bg-slate-950 rounded-xl overflow-hidden border border-slate-800">
+          <canvas id="micro-canvas" class="w-full h-full block"></canvas>
+        </div>
+        <div class="mt-2 text-[11px] text-slate-300 flex justify-between items-center">
+          <span id="micro-view-label" class="font-medium text-cyan-300">Anode Electrode Surface</span>
+          <button onclick="switchMicroTarget()" class="text-[10px] text-cyan-400 hover:underline">
+            Switch to <span id="micro-target-next">Cathode</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Data & Chemical Calculations Panel -->
+    <aside class="w-full lg:w-96 shrink-0 border-l border-slate-800 glass-panel flex flex-col overflow-y-auto max-h-[50vh] lg:max-h-none z-10">
+      <div class="p-4 border-b border-slate-800/60 bg-slate-900/40 flex items-center justify-between">
+        <h2 class="font-semibold text-sm uppercase tracking-wider text-cyan-400 flex items-center gap-2">
+          <i class="fa-solid fa-square-root-variable"></i> Chemical Analysis & Equations
+        </h2>
+      </div>
+
+      <div class="p-4 space-y-4 flex-1">
+
+        <!-- Anode Half-Reaction Card -->
+        <div class="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-red-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-minus-circle"></i> ANODE (Oxidation)
+            </span>
+            <span id="anode-metal-tag" class="text-xs font-mono px-2 py-0.5 rounded bg-red-950/80 text-red-300 border border-red-800/50">Zn(s)</span>
+          </div>
+          <div id="anode-reaction-eq" class="font-mono text-sm text-slate-100 bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-center font-medium">
+            Zn(s) → Zn²⁺(aq) + 2e⁻
+          </div>
+          <div class="text-[11px] text-slate-400 flex justify-between px-1">
+            <span>Oxidation Potential E°_ox:</span>
+            <span id="anode-e-ox" class="font-mono text-slate-200">+0.76 V</span>
+          </div>
+        </div>
+
+        <!-- Cathode Half-Reaction Card -->
+        <div class="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-plus-circle"></i> CATHODE (Reduction)
+            </span>
+            <span id="cathode-metal-tag" class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/50">Cu(s)</span>
+          </div>
+          <div id="cathode-reaction-eq" class="font-mono text-sm text-slate-100 bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-center font-medium">
+            Cu²⁺(aq) + 2e⁻ → Cu(s)
+          </div>
+          <div class="text-[11px] text-slate-400 flex justify-between px-1">
+            <span>Reduction Potential E°_red:</span>
+            <span id="cathode-e-red" class="font-mono text-slate-200">+0.34 V</span>
+          </div>
+        </div>
+
+        <!-- Overall Cell Reaction Card -->
+        <div class="bg-slate-900/80 rounded-xl p-3.5 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-arrows-spin"></i> Net Cell Reaction
+            </span>
+            <span id="electrons-transferred-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">n = 2 e⁻</span>
+          </div>
+          <div id="overall-reaction-eq" class="font-mono text-xs md:text-sm text-slate-100 bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-center font-semibold text-cyan-300 overflow-x-auto">
+            Zn(s) + Cu²⁺(aq) ⇌ Zn²⁺(aq) + Cu(s)
+          </div>
+        </div>
+
+        <!-- Nernst Equation Breakdown -->
+        <div class="bg-slate-900/90 rounded-xl p-3.5 border border-slate-800 space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="text-xs font-bold text-slate-200">Nernst Equation Computation</span>
+            <span class="text-[10px] text-slate-400 font-mono">E = E° - (RT/nF) ln Q</span>
+          </div>
+
+          <div class="space-y-2 text-xs font-mono">
+            <div class="flex justify-between items-center text-slate-300">
+              <span class="text-slate-400">Standard Cell E°_cell:</span>
+              <span id="calc-e-standard" class="text-slate-100 font-semibold">+1.100 V</span>
+            </div>
+
+            <div class="flex justify-between items-center text-slate-300">
+              <span class="text-slate-400">Reaction Quotient (Q):</span>
+              <span id="calc-q-val" class="text-slate-100 font-semibold">1.000</span>
+            </div>
+
+            <div class="p-2 rounded bg-slate-950 text-[11px] text-slate-300 border border-slate-800/80 leading-relaxed">
+              <div id="nernst-step-1" class="text-slate-400">Q = [Anode]/[Cathode] = 1.00 / 1.00 = 1.000</div>
+              <div id="nernst-step-2" class="text-cyan-400 mt-1 font-semibold">E = 1.100 - (0.0592/2) log₁₀(1.000)</div>
+              <div id="nernst-step-3" class="text-emerald-400 mt-1 font-bold">E_cell = +1.100 V</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Educational Key Takeaways -->
+        <div class="bg-slate-900/50 rounded-xl p-3 border border-slate-800/60 text-xs text-slate-400 space-y-1.5">
+          <div class="font-semibold text-slate-300 flex items-center gap-1.5">
+            <i class="fa-solid fa-graduation-cap text-cyan-400"></i> Key Principles
+          </div>
+          <ul class="list-disc list-inside space-y-1 text-[11px] text-slate-400">
+            <li><strong class="text-slate-300">Anode:</strong> Site of Oxidation (Loss of e⁻). Mass decreases.</li>
+            <li><strong class="text-slate-300">Cathode:</strong> Site of Reduction (Gain of e⁻). Mass increases.</li>
+            <li><strong class="text-slate-300">Electrons:</strong> Flow from Anode to Cathode in wire.</li>
+            <li><strong class="text-slate-300">Salt Bridge:</strong> Maintains electrical neutrality (Anions → Anode beaker, Cations → Cathode beaker).</li>
+          </ul>
+        </div>
+
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Help & Info Modal -->
+  <div id="info-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-xl w-full p-6 shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto">
+      <button onclick="toggleModal('info-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-200">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-flask"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-100 text-lg">How to Use the Electrochemical Simulator</h3>
+          <p class="text-xs text-slate-400">Master galvanic cells, redox reactions, and the Nernst equation</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-300 leading-relaxed border-t border-slate-800 pt-3">
+        <p><strong class="text-cyan-400">1. Selecting Metals:</strong> Choose metals for the left and right electrodes. The metal with the lower standard reduction potential ($E^\circ$) will naturally act as the <strong>Anode</strong> (oxidation), while the higher $E^\circ$ metal becomes the <strong>Cathode</strong> (reduction).</p>
+        
+        <p><strong class="text-cyan-400">2. Circuit Switch & Salt Bridge:</strong>
+          <br>• Disconnecting the switch stops electron flow in the wire.
+          <br>• Removing the salt bridge prevents ion migration, building up charge imbalance and stopping the current immediately.
+        </p>
+
+        <p><strong class="text-cyan-400">3. Concentration & Nernst Equation:</strong> Use the sliders to adjust electrolyte ion concentrations ($[M^{n+}]$). Non-standard concentrations change the reaction quotient $Q$ and shift the cell potential according to:
+          $$\text{E}_{\text{cell}} = \text{E}^\circ_{\text{cell}} - \frac{RT}{nF} \ln Q$$
+        </p>
+
+        <p><strong class="text-cyan-400">4. Microscopic View:</strong> Click "Show Atomic Inset" to zoom into the electrode-solution interface and watch metal atoms lose electrons into the wire or aqueous ions gain electrons and deposit onto the electrode surface.</p>
+      </div>
+
+      <div class="pt-2 flex justify-end">
+        <button onclick="toggleModal('info-modal')" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs rounded-lg transition">
+          Got it!
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript Implementation -->
+  <script>
+    // Metal Electrode Database with Standard Reduction Potentials (vs SHE at 25°C)
+    const METALS = {
+      'Mg': { name: 'Magnesium', symbol: 'Mg', E0: -2.372, valence: 2, color: '#e2e8f0', gradient: ['#cbd5e1', '#94a3b8'], liquidColor: 'rgba(224, 242, 254, 0.25)' },
+      'Al': { name: 'Aluminium', symbol: 'Al', E0: -1.662, valence: 3, color: '#cbd5e1', gradient: ['#e2e8f0', '#94a3b8'], liquidColor: 'rgba(224, 242, 254, 0.25)' },
+      'Zn': { name: 'Zinc', symbol: 'Zn', E0: -0.762, valence: 2, color: '#a1a1aa', gradient: ['#d4d4d8', '#71717a'], liquidColor: 'rgba(224, 242, 254, 0.25)' },
+      'Fe': { name: 'Iron', symbol: 'Fe', E0: -0.447, valence: 2, color: '#64748b', gradient: ['#64748b', '#334155'], liquidColor: 'rgba(132, 204, 22, 0.25)' },
+      'Ni': { name: 'Nickel', symbol: 'Ni', E0: -0.257, valence: 2, color: '#a8a29e', gradient: ['#d6d3d1', '#78716c'], liquidColor: 'rgba(34, 197, 94, 0.25)' },
+      'Pb': { name: 'Lead', symbol: 'Pb', E0: -0.126, valence: 2, color: '#6b7280', gradient: ['#9ca3af', '#4b5563'], liquidColor: 'rgba(224, 242, 254, 0.25)' },
+      'Cu': { name: 'Copper', symbol: 'Cu', E0: +0.342, valence: 2, color: '#f97316', gradient: ['#fb923c', '#c2410c'], liquidColor: 'rgba(59, 130, 246, 0.35)' },
+      'Ag': { name: 'Silver', symbol: 'Ag', E0: +0.799, valence: 1, color: '#f8fafc', gradient: ['#ffffff', '#cbd5e1'], liquidColor: 'rgba(224, 242, 254, 0.30)' }
+    };
+
+    // Preset configurations
+    const PRESETS = {
+      'daniell': { left: 'Zn', leftConc: 1.0, right: 'Cu', rightConc: 1.0 },
+      'silver_copper': { left: 'Cu', leftConc: 1.0, right: 'Ag', rightConc: 1.0 },
+      'high_voltage': { left: 'Mg', leftConc: 1.0, right: 'Ag', rightConc: 1.0 },
+      'concentration': { left: 'Zn', leftConc: 0.05, right: 'Zn', rightConc: 1.5 }
+    };
+
+    // Cell State
+    let state = {
+      leftMetalKey: 'Zn',
+      leftConc: 1.00,
+      rightMetalKey: 'Cu',
+      rightConc: 1.00,
+      temperatureC: 25,
+      circuitConnected: true,
+      saltBridgeActive: true,
+      loadMode: 'voltmeter', // 'voltmeter' or 'bulb'
+      showMicroscope: false,
+      microTarget: 'anode', // 'anode' or 'cathode'
+      
+      // Dynamic Calculated Values
+      anodeKey: 'Zn',
+      cathodeKey: 'Cu',
+      anodeIsLeft: true,
+      nElectrons: 2,
+      E_standard: 1.100,
+      Q: 1.000,
+      E_cell: 1.100,
+      
+      // Animation timers & particles
+      electronOffset: 0,
+      saltBridgeParticles: [],
+      solutionIonsLeft: [],
+      solutionIonsRight: [],
+      microAtoms: []
+    };
+
+    // DOM Elements & Canvas References
+    let canvas, ctx;
+    let microCanvas, microCtx;
+    let animFrameId = null;
+
+    window.onload = function() {
+      initDOMElements();
+      populateMetalSelects();
+      initParticles();
+      initMicroParticles();
+      
+      // Setup Canvas Resize Handlers
+      setupCanvasResize();
+      window.addEventListener('resize', setupCanvasResize);
+
+      // Load initial Daniell Cell configuration
+      loadPreset('daniell');
+
+      // Start main rendering loop
+      requestAnimationFrame(renderLoop);
+    };
+
+    function initDOMElements() {
+      canvas = document.getElementById('cell-canvas');
+      ctx = canvas.getContext('2d');
+
+      microCanvas = document.getElementById('micro-canvas');
+      microCtx = microCanvas.getContext('2d');
+    }
+
+    function setupCanvasResize() {
+      const container = document.getElementById('canvas-container');
+      if (container && canvas) {
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio || rect.width;
+        canvas.height = rect.height * window.devicePixelRatio || rect.height;
+      }
+      if (microCanvas) {
+        microCanvas.width = microCanvas.clientWidth * window.devicePixelRatio || microCanvas.clientWidth;
+        microCanvas.height = microCanvas.clientHeight * window.devicePixelRatio || microCanvas.clientHeight;
+      }
+    }
+
+    function populateMetalSelects() {
+      const leftSelect = document.getElementById('left-metal-select');
+      const rightSelect = document.getElementById('right-metal-select');
+
+      leftSelect.innerHTML = '';
+      rightSelect.innerHTML = '';
+
+      Object.keys(METALS).forEach(key => {
+        const m = METALS[key];
+        const opt1 = document.createElement('option');
+        opt1.value = key;
+        opt1.textContent = `${m.name} (${m.symbol}) - E° = ${m.E0 >= 0 ? '+' : ''}${m.E0.toFixed(2)} V`;
+        leftSelect.appendChild(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = key;
+        opt2.textContent = `${m.name} (${m.symbol}) - E° = ${m.E0 >= 0 ? '+' : ''}${m.E0.toFixed(2)} V`;
+        rightSelect.appendChild(opt2);
+      });
+    }
+
+    function updateCellSettings() {
+      state.leftMetalKey = document.getElementById('left-metal-select').value;
+      state.rightMetalKey = document.getElementById('right-metal-select').value;
+      state.leftConc = parseFloat(document.getElementById('left-conc-slider').value);
+      state.rightConc = parseFloat(document.getElementById('right-conc-slider').value);
+      state.temperatureC = parseFloat(document.getElementById('temp-slider').value);
+
+      // UI Labels update
+      document.getElementById('left-conc-val').textContent = state.leftConc.toFixed(2) + ' M';
+      document.getElementById('right-conc-val').textContent = state.rightConc.toFixed(2) + ' M';
+      
+      const tempK = (state.temperatureC + 273.15).toFixed(2);
+      document.getElementById('temp-val').textContent = `${state.temperatureC} °C (${tempK} K)`;
+
+      document.getElementById('left-standard-e').textContent = (METALS[state.leftMetalKey].E0 >= 0 ? '+' : '') + METALS[state.leftMetalKey].E0.toFixed(2) + ' V';
+      document.getElementById('right-standard-e').textContent = (METALS[state.rightMetalKey].E0 >= 0 ? '+' : '') + METALS[state.rightMetalKey].E0.toFixed(2) + ' V';
+
+      calculateElectrochemicalData();
+      initParticles();
+    }
+
+    function calculateElectrochemicalData() {
+      const leftM = METALS[state.leftMetalKey];
+      const rightM = METALS[state.rightMetalKey];
+
+      // Determine Anode vs Cathode
+      // Standard rule: Metal with LOWER reduction potential gets oxidized (ANODE).
+      // In case of concentration cell (same metal), electrode in lower concentration gets oxidized.
+      let leftIsAnode = false;
+
+      if (leftM.E0 < rightM.E0) {
+        leftIsAnode = true;
+      } else if (leftM.E0 > rightM.E0) {
+        leftIsAnode = false;
+      } else {
+        // Concentration cell case
+        leftIsAnode = state.leftConc <= state.rightConc;
+      }
+
+      state.anodeIsLeft = leftIsAnode;
+      state.anodeKey = leftIsAnode ? state.leftMetalKey : state.rightMetalKey;
+      state.cathodeKey = leftIsAnode ? state.rightMetalKey : state.leftMetalKey;
+
+      const anodeM = METALS[state.anodeKey];
+      const cathodeM = METALS[state.cathodeKey];
+
+      const anodeConc = leftIsAnode ? state.leftConc : state.rightConc;
+      const cathodeConc = leftIsAnode ? state.rightConc : state.leftConc;
+
+      // Update UI tags for roles
+      document.getElementById('left-role-tag').textContent = leftIsAnode ? 'ANODE (-)' : 'CATHODE (+)';
+      document.getElementById('left-role-tag').className = leftIsAnode ? 
+        'text-[10px] font-bold px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-800' :
+        'text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800';
+
+      document.getElementById('right-role-tag').textContent = !leftIsAnode ? 'ANODE (-)' : 'CATHODE (+)';
+      document.getElementById('right-role-tag').className = !leftIsAnode ? 
+        'text-[10px] font-bold px-2 py-0.5 rounded bg-red-950 text-red-400 border border-red-800' :
+        'text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800';
+
+      // Transferred electrons calculation (LCM of valences)
+      const vA = anodeM.valence;
+      const vC = cathodeM.valence;
+      function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+      const n = (vA * vC) / gcd(vA, vC);
+      state.nElectrons = n;
+
+      const stochA = n / vA; // Coefficient for anode ion in balanced equation
+      const stochC = n / vC; // Coefficient for cathode ion in balanced equation
+
+      // Standard cell potential E°_cell = E°_cathode - E°_anode
+      state.E_standard = cathodeM.E0 - anodeM.E0;
+
+      // Reaction quotient Q = [Anode_Ion]^stochA / [Cathode_Ion]^stochC
+      state.Q = Math.pow(anodeConc, stochA) / Math.pow(cathodeConc, stochC);
+
+      // Nernst Equation: E = E° - (R*T / (n*F)) * ln(Q)
+      const R = 8.31446;
+      const F = 96485.3;
+      const TempK = state.temperatureC + 273.15;
+      const nernstFactor = (R * TempK) / (n * F);
+
+      let E_calc = state.E_standard - nernstFactor * Math.log(state.Q);
+
+      // If switch or salt bridge is off, active voltage reading behaves accordingly
+      state.E_cell = E_calc;
+
+      // Update UI Display Elements
+      const voltageText = (state.circuitConnected && state.saltBridgeActive) ? 
+        (state.E_cell >= 0 ? '+' : '') + state.E_cell.toFixed(3) + ' V' : '0.000 V (Open Circuit)';
+
+      document.getElementById('live-voltage').textContent = voltageText;
+      
+      const typeBadge = document.getElementById('live-cell-type');
+      if (!state.saltBridgeActive || !state.circuitConnected) {
+        typeBadge.textContent = 'Incomplete Circuit';
+        typeBadge.className = 'text-xs font-semibold text-amber-400';
+      } else if (state.E_cell > 0) {
+        typeBadge.textContent = 'Galvanic (Spontaneous)';
+        typeBadge.className = 'text-xs font-semibold text-emerald-400';
+      } else if (state.E_cell === 0) {
+        typeBadge.textContent = 'Equilibrium (E = 0)';
+        typeBadge.className = 'text-xs font-semibold text-slate-400';
+      } else {
+        typeBadge.textContent = 'Non-Spontaneous (Electrolytic)';
+        typeBadge.className = 'text-xs font-semibold text-red-400';
+      }
+
+      // Half Cell & Net Chemical Equations
+      document.getElementById('anode-metal-tag').textContent = `${anodeM.symbol}(s)`;
+      document.getElementById('anode-reaction-eq').textContent = `${anodeM.symbol}(s) → ${anodeM.symbol}${anodeM.valence === 1 ? '⁺' : (anodeM.valence + '⁺')}(aq) + ${anodeM.valence}e⁻`;
+      document.getElementById('anode-e-ox').textContent = ((-anodeM.E0) >= 0 ? '+' : '') + (-anodeM.E0).toFixed(2) + ' V';
+
+      document.getElementById('cathode-metal-tag').textContent = `${cathodeM.symbol}(s)`;
+      document.getElementById('cathode-reaction-eq').textContent = `${cathodeM.symbol}${cathodeM.valence === 1 ? '⁺' : (cathodeM.valence + '⁺')}(aq) + ${cathodeM.valence}e⁻ → ${cathodeM.symbol}(s)`;
+      document.getElementById('cathode-e-red').textContent = (cathodeM.E0 >= 0 ? '+' : '') + cathodeM.E0.toFixed(2) + ' V';
+
+      document.getElementById('electrons-transferred-tag').textContent = `n = ${n} e⁻`;
+
+      // Formulate net reaction equation string
+      let netEq = '';
+      const coeffA = stochA > 1 ? stochA : '';
+      const coeffC = stochC > 1 ? stochC : '';
+
+      const ionA_str = `${anodeM.symbol}${anodeM.valence === 1 ? '⁺' : (anodeM.valence + '⁺')}`;
+      const ionC_str = `${cathodeM.symbol}${cathodeM.valence === 1 ? '⁺' : (cathodeM.valence + '⁺')}`;
+
+      netEq = `${coeffA ? coeffA : ''}${anodeM.symbol}(s) + ${coeffC ? coeffC : ''}${ionC_str}(aq) ⇌ ${coeffA ? coeffA : ''}${ionA_str}(aq) + ${coeffC ? coeffC : ''}${cathodeM.symbol}(s)`;
+      document.getElementById('overall-reaction-eq').textContent = netEq;
+
+      // Breakdown in Nernst Panel
+      document.getElementById('calc-e-standard').textContent = (state.E_standard >= 0 ? '+' : '') + state.E_standard.toFixed(3) + ' V';
+      document.getElementById('calc-q-val').textContent = state.Q.toFixed(4);
+
+      document.getElementById('nernst-step-1').textContent = `Q = [${anodeM.symbol}${anodeM.valence}+]${stochA > 1 ? '^'+stochA : ''} / [${cathodeM.symbol}${cathodeM.valence}+]${stochC > 1 ? '^'+stochC : ''} = ${state.Q.toFixed(4)}`;
+      
+      // Dynamic 2.303*R*T/F slope factor for Nernst log10 display
+      const nernstSlope2303 = ((2.302585 * R * TempK) / F).toFixed(4);
+      document.getElementById('nernst-step-2').textContent = `E = ${state.E_standard.toFixed(3)} - (${nernstSlope2303}/${n}) log₁₀(${state.Q.toFixed(4)})`;
+      document.getElementById('nernst-step-3').textContent = `E_cell = ${state.E_cell.toFixed(3)} V`;
+    }
+
+    function loadPreset(presetKey) {
+      if (!PRESETS[presetKey]) return;
+      const p = PRESETS[presetKey];
+      document.getElementById('left-metal-select').value = p.left;
+      document.getElementById('right-metal-select').value = p.right;
+      document.getElementById('left-conc-slider').value = p.leftConc;
+      document.getElementById('right-conc-slider').value = p.rightConc;
+      updateCellSettings();
+    }
+
+    function toggleCircuit() {
+      state.circuitConnected = !state.circuitConnected;
+      const btn = document.getElementById('switch-btn');
+      const badge = document.getElementById('circuit-status-badge');
+      const text = document.getElementById('switch-btn-text');
+
+      if (state.circuitConnected) {
+        btn.className = 'py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-semibold text-xs flex items-center justify-center gap-2 shadow transition';
+        badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800';
+        badge.textContent = 'CONNECTED';
+        text.textContent = 'Disconnect';
+      } else {
+        btn.className = 'py-2 px-3 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow transition';
+        badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full bg-red-950 text-red-400 border border-red-800';
+        badge.textContent = 'OPEN CIRCUIT';
+        text.textContent = 'Connect Circuit';
+      }
+      calculateElectrochemicalData();
+    }
+
+    function toggleSaltBridge() {
+      state.saltBridgeActive = !state.saltBridgeActive;
+      const btn = document.getElementById('salt-bridge-btn');
+      const text = document.getElementById('salt-bridge-text');
+
+      if (state.saltBridgeActive) {
+        btn.className = 'py-2 px-3 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 shadow transition';
+        text.textContent = 'Remove Bridge';
+      } else {
+        btn.className = 'py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 border border-slate-700 transition';
+        text.textContent = 'Insert Bridge';
+      }
+      calculateElectrochemicalData();
+    }
+
+    function swapElectrodes() {
+      const tempMetal = state.leftMetalKey;
+      const tempConc = state.leftConc;
+
+      document.getElementById('left-metal-select').value = state.rightMetalKey;
+      document.getElementById('right-metal-select').value = tempMetal;
+
+      document.getElementById('left-conc-slider').value = state.rightConc;
+      document.getElementById('right-conc-slider').value = tempConc;
+
+      updateCellSettings();
+    }
+
+    function setLoadMode(mode) {
+      state.loadMode = mode;
+      document.getElementById('mode-voltmeter-btn').className = mode === 'voltmeter' ?
+        'py-1.5 px-2 rounded text-xs border border-cyan-500 bg-cyan-950/60 text-cyan-300 font-medium text-center' :
+        'py-1.5 px-2 rounded text-xs border border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200 font-medium text-center';
+
+      document.getElementById('mode-bulb-btn').className = mode === 'bulb' ?
+        'py-1.5 px-2 rounded text-xs border border-amber-500 bg-amber-950/60 text-amber-300 font-medium text-center' :
+        'py-1.5 px-2 rounded text-xs border border-slate-700 bg-slate-900 text-slate-400 hover:text-slate-200 font-medium text-center';
+    }
+
+    function toggleMicroscope() {
+      state.showMicroscope = !state.showMicroscope;
+      const container = document.getElementById('atomic-view-container');
+      const btnText = document.getElementById('microscope-btn-text');
+
+      if (state.showMicroscope) {
+        container.classList.remove('hidden');
+        btnText.textContent = 'Hide Atomic Inset';
+      } else {
+        container.classList.add('hidden');
+        btnText.textContent = 'Show Atomic Inset';
+      }
+    }
+
+    function switchMicroTarget() {
+      state.microTarget = state.microTarget === 'anode' ? 'cathode' : 'anode';
+      const label = document.getElementById('micro-view-label');
+      const nextBtn = document.getElementById('micro-target-next');
+
+      if (state.microTarget === 'anode') {
+        label.textContent = 'Anode Electrode Surface (Oxidation)';
+        nextBtn.textContent = 'Cathode';
+      } else {
+        label.textContent = 'Cathode Electrode Surface (Reduction)';
+        nextBtn.textContent = 'Anode';
+      }
+      initMicroParticles();
+    }
+
+    function resetCell() {
+      document.getElementById('temp-slider').value = 25;
+      if (!state.circuitConnected) toggleCircuit();
+      if (!state.saltBridgeActive) toggleSaltBridge();
+      loadPreset('daniell');
+    }
+
+    function toggleModal(id) {
+      const m = document.getElementById(id);
+      if (m) m.classList.toggle('hidden');
+    }
+
+    function initParticles() {
+      // Salt Bridge Ions
+      state.saltBridgeParticles = [];
+      for (let i = 0; i < 24; i++) {
+        state.saltBridgeParticles.push({
+          progress: Math.random(), // 0 to 1 along bridge length
+          type: Math.random() > 0.5 ? 'cation' : 'anion', // K+ or NO3-
+          offsetY: (Math.random() - 0.5) * 12
+        });
+      }
+
+      // Solution Ions in Beakers
+      state.solutionIonsLeft = [];
+      for (let i = 0; i < 20; i++) {
+        state.solutionIonsLeft.push({
+          x: Math.random(),
+          y: Math.random(),
+          vx: (Math.random() - 0.5) * 0.005,
+          vy: (Math.random() - 0.5) * 0.005
+        });
+      }
+
+      state.solutionIonsRight = [];
+      for (let i = 0; i < 20; i++) {
+        state.solutionIonsRight.push({
+          x: Math.random(),
+          y: Math.random(),
+          vx: (Math.random() - 0.5) * 0.005,
+          vy: (Math.random() - 0.5) * 0.005
+        });
+      }
+    }
+
+    function initMicroParticles() {
+      state.microAtoms = [];
+      // Surface lattice atoms
+      for (let row = 0; row < 4; row++) {
+        for (let col = 0; col < 8; col++) {
+          state.microAtoms.push({
+            x: col * 26 + 15 + (row % 2 === 1 ? 13 : 0),
+            y: 120 + row * 22,
+            type: 'metal',
+            state: 'lattice', // 'lattice', 'dissolving', 'depositing'
+            progress: 0
+          });
+        }
+      }
+    }
+
+    function renderLoop() {
+      if (canvas && ctx) {
+        drawMainCanvas();
+      }
+      if (state.showMicroscope && microCanvas && microCtx) {
+        drawMicroscopeCanvas();
+      }
+      requestAnimationFrame(renderLoop);
+    }
+
+    function drawMainCanvas() {
+      const dpr = window.devicePixelRatio || 1;
+      const w = canvas.width / dpr;
+      const h = canvas.height / dpr;
+
+      ctx.save();
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, w, h);
+
+      // Canvas background gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+      bgGrad.addColorStop(0, '#020617');
+      bgGrad.addColorStop(1, '#0f172a');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Layout Geometry Dimensions
+      const beakerW = Math.min(w * 0.32, 240);
+      const beakerH = Math.min(h * 0.42, 220);
+      const beakerY = h * 0.48;
+
+      const leftBeakerX = w * 0.28 - beakerW / 2;
+      const rightBeakerX = w * 0.72 - beakerW / 2;
+
+      // 1. Draw Solution Liquids in Beakers
+      drawBeakerSolution(leftBeakerX, beakerY, beakerW, beakerH, METALS[state.leftMetalKey].liquidColor, state.leftConc, state.leftMetalKey);
+      drawBeakerSolution(rightBeakerX, beakerY, beakerW, beakerH, METALS[state.rightMetalKey].liquidColor, state.rightConc, state.rightMetalKey);
+
+      // 2. Draw Beaker Glass Outlines
+      drawBeakerGlass(leftBeakerX, beakerY, beakerW, beakerH, `Electrolyte 1: ${state.leftMetalKey}²⁺ (${state.leftConc}M)`);
+      drawBeakerGlass(rightBeakerX, beakerY, beakerW, beakerH, `Electrolyte 2: ${state.rightMetalKey}²⁺ (${state.rightConc}M)`);
+
+      // 3. Draw Electrodes submerged in beakers
+      const electrodeW = 32;
+      const electrodeH = beakerH * 0.9;
+      const leftElectrodeX = leftBeakerX + beakerW / 2 - electrodeW / 2;
+      const rightElectrodeX = rightBeakerX + beakerW / 2 - electrodeW / 2;
+      const electrodeY = beakerY - 30;
+
+      drawElectrode(leftElectrodeX, electrodeY, electrodeW, electrodeH, METALS[state.leftMetalKey], state.anodeIsLeft ? 'ANODE (-)' : 'CATHODE (+)', state.anodeIsLeft);
+      drawElectrode(rightElectrodeX, electrodeY, electrodeW, electrodeH, METALS[state.rightMetalKey], !state.anodeIsLeft ? 'ANODE (-)' : 'CATHODE (+)', !state.anodeIsLeft);
+
+      // 4. Draw Salt Bridge
+      const bridgeTopY = beakerY - 45;
+      if (state.saltBridgeActive) {
+        drawSaltBridge(leftBeakerX + beakerW * 0.65, rightBeakerX + beakerW * 0.35, beakerY + 40, bridgeTopY);
+      } else {
+        // Draw prompt warning for salt bridge removal
+        ctx.font = '600 12px Inter';
+        ctx.fillStyle = '#f59e0b';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚠️ Salt Bridge Removed (Circuit Broken)', w / 2, beakerY + 20);
+      }
+
+      // 5. External Circuit Wires & Top Multimeter / Bulb
+      const meterX = w / 2;
+      const meterY = h * 0.16;
+
+      drawExternalCircuitWires(
+        leftElectrodeX + electrodeW / 2, electrodeY,
+        rightElectrodeX + electrodeW / 2, electrodeY,
+        meterX, meterY
+      );
+
+      // 6. Draw Voltmeter or Light Bulb Meter
+      if (state.loadMode === 'voltmeter') {
+        drawVoltmeter(meterX, meterY);
+      } else {
+        drawLightBulb(meterX, meterY);
+      }
+
+      // 7. Dynamic Particle Animations (Electrons, Salt bridge ions, Solution ions)
+      const flowActive = state.circuitConnected && state.saltBridgeActive && state.E_cell !== 0;
+
+      if (flowActive) {
+        state.electronOffset += (state.E_cell > 0 ? 1 : -1) * 1.5;
+        drawElectronFlowAnimation(
+          leftElectrodeX + electrodeW / 2, electrodeY,
+          rightElectrodeX + electrodeW / 2, electrodeY,
+          meterX, meterY,
+          state.anodeIsLeft
+        );
+      }
+
+      if (state.saltBridgeActive && flowActive) {
+        drawSaltBridgeIonsAnimation(leftBeakerX + beakerW * 0.65, rightBeakerX + beakerW * 0.35, beakerY + 40, bridgeTopY);
+      }
+
+      // Draw aqueous ion motion in beakers
+      drawSolutionIons(leftBeakerX, beakerY, beakerW, beakerH, state.solutionIonsLeft, state.leftMetalKey, flowActive, state.anodeIsLeft);
+      drawSolutionIons(rightBeakerX, beakerY, beakerW, beakerH, state.solutionIonsRight, state.rightMetalKey, flowActive, !state.anodeIsLeft);
+
+      ctx.restore();
+    }
+
+    function drawBeakerGlass(x, y, w, h, label) {
+      ctx.save();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(203, 213, 225, 0.4)';
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.2)';
+
+      ctx.beginPath();
+      ctx.moveTo(x, y - 5);
+      ctx.lineTo(x, y + h - 12);
+      ctx.quadraticCurveTo(x, y + h, x + 12, y + h);
+      ctx.lineTo(x + w - 12, y + h);
+      ctx.quadraticCurveTo(x + w, y + h, x + w, y + h - 12);
+      ctx.lineTo(x + w, y - 5);
+      ctx.stroke();
+
+      // Glass rim highlights
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y - 5, w / 2, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Measurement tick marks
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+      ctx.lineWidth = 1;
+      for (let i = 1; i <= 4; i++) {
+        const tickY = y + h - (h / 5) * i;
+        ctx.beginPath();
+        ctx.moveTo(x + 5, tickY);
+        ctx.lineTo(x + 20, tickY);
+        ctx.stroke();
+      }
+
+      // Label at bottom of beaker
+      ctx.font = '500 11px Inter';
+      ctx.fillStyle = '#94a3b8';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x + w / 2, y + h + 22);
+
+      ctx.restore();
+    }
+
+    function drawBeakerSolution(x, y, w, h, liquidColor, concentration, metalKey) {
+      ctx.save();
+      const liquidTopY = y + 25;
+      const liquidH = h - 30;
+
+      // Solution Gradient Fill
+      const grad = ctx.createLinearGradient(0, liquidTopY, 0, y + h);
+      grad.addColorStop(0, liquidColor);
+      grad.addColorStop(1, 'rgba(15, 23, 42, 0.85)');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(x + 2, liquidTopY);
+      ctx.lineTo(x + 2, y + h - 10);
+      ctx.quadraticCurveTo(x + 2, y + h - 2, x + 10, y + h - 2);
+      ctx.lineTo(x + w - 10, y + h - 2);
+      ctx.quadraticCurveTo(x + w - 2, y + h - 2, x + w - 2, y + h - 10);
+      ctx.lineTo(x + w - 2, liquidTopY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Surface meniscus line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, liquidTopY, w / 2 - 2, 5, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawElectrode(x, y, w, h, metalData, roleText, isAnode) {
+      ctx.save();
+
+      // Metal Gradient Fill
+      const grad = ctx.createLinearGradient(x, y, x + w, y);
+      grad.addColorStop(0, metalData.gradient[0]);
+      grad.addColorStop(1, metalData.gradient[1]);
+
+      ctx.fillStyle = grad;
+      ctx.shadowColor = isAnode ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)';
+      ctx.shadowBlur = 10;
+
+      // Draw rectangular plate with rounded top
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, [6, 6, 2, 2]);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Metal Symbol on Electrode
+      ctx.font = '700 13px JetBrains Mono';
+      ctx.fillStyle = isAnode ? '#1e293b' : '#020617';
+      ctx.textAlign = 'center';
+      ctx.fillText(metalData.symbol, x + w / 2, y + 35);
+
+      // Electrode Role Badge Above Beaker
+      ctx.font = '700 11px Inter';
+      ctx.fillStyle = isAnode ? '#f87171' : '#34d399';
+      ctx.fillText(roleText, x + w / 2, y - 12);
+
+      // Oxidation / Reduction Sub-label
+      ctx.font = '500 10px Inter';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(isAnode ? 'Oxidation' : 'Reduction', x + w / 2, y - 26);
+
+      ctx.restore();
+    }
+
+    function drawSaltBridge(xLeft, xRight, dipY, topY) {
+      ctx.save();
+
+      ctx.lineWidth = 20;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(224, 231, 255, 0.25)';
+
+      // Inverted U-tube path
+      ctx.beginPath();
+      ctx.moveTo(xLeft, dipY);
+      ctx.lineTo(xLeft, topY);
+      ctx.lineTo(xRight, topY);
+      ctx.lineTo(xRight, dipY);
+      ctx.stroke();
+
+      // Glass Tube Outer Borders
+      ctx.lineWidth = 22;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.stroke();
+
+      // Salt Bridge Text Badge
+      const midX = (xLeft + xRight) / 2;
+      ctx.font = '600 10px Inter';
+      ctx.fillStyle = '#a5b4fc';
+      ctx.textAlign = 'center';
+      ctx.fillText('Salt Bridge (KNO₃ Gel)', midX, topY - 10);
+
+      ctx.restore();
+    }
+
+    function drawExternalCircuitWires(x1, y1, x2, y2, meterX, meterY) {
+      ctx.save();
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#f59e0b'; // Copper wire yellow-orange
+
+      // Left wire: Electrode 1 up to Meter
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x1, meterY + 20);
+      ctx.lineTo(meterX - 45, meterY + 20);
+      ctx.stroke();
+
+      // Right wire: Meter to Electrode 2
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2, meterY + 20);
+      ctx.lineTo(meterX + 45, meterY + 20);
+      ctx.stroke();
+
+      // Switch visual indicator inline
+      const switchX = (x1 + (meterX - 45)) / 2;
+      const switchY = meterY + 20;
+
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath();
+      ctx.arc(switchX - 8, switchY, 5, 0, Math.PI * 2);
+      ctx.arc(switchX + 8, switchY, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.stroke();
+
+      // Switch Lever
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = state.circuitConnected ? '#10b981' : '#ef4444';
+      ctx.beginPath();
+      ctx.moveTo(switchX - 8, switchY);
+      if (state.circuitConnected) {
+        ctx.lineTo(switchX + 8, switchY);
+      } else {
+        ctx.lineTo(switchX + 4, switchY - 14); // Open circuit lever up
+      }
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawVoltmeter(cx, cy) {
+      ctx.save();
+
+      const w = 100;
+      const h = 60;
+      const x = cx - w / 2;
+      const y = cy - h / 2;
+
+      // Meter Box Body
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 10);
+      ctx.fill();
+      ctx.stroke();
+
+      // Digital Screen Display
+      ctx.fillStyle = '#020617';
+      ctx.beginPath();
+      ctx.roundRect(x + 10, y + 10, w - 20, 26, 4);
+      ctx.fill();
+
+      // Voltage Text Output
+      ctx.font = '700 13px JetBrains Mono';
+      ctx.fillStyle = (state.circuitConnected && state.saltBridgeActive) ? '#22d3ee' : '#64748b';
+      ctx.textAlign = 'center';
+      
+      const vVal = (state.circuitConnected && state.saltBridgeActive) ? 
+        (state.E_cell >= 0 ? '+' : '') + state.E_cell.toFixed(3) + ' V' : '0.000 V';
+
+      ctx.fillText(vVal, cx, y + 27);
+
+      // Voltmeter Label
+      ctx.font = '600 9px Inter';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText('DC VOLTMETER', cx, y + 48);
+
+      ctx.restore();
+    }
+
+    function drawLightBulb(cx, cy) {
+      ctx.save();
+
+      const active = state.circuitConnected && state.saltBridgeActive && state.E_cell > 0;
+      const brightness = active ? Math.min(Math.max(state.E_cell / 2.0, 0.2), 1.0) : 0;
+
+      // Glow rays if active
+      if (active) {
+        const glowGrad = ctx.createRadialGradient(cx, cy, 5, cx, cy, 45);
+        glowGrad.addColorStop(0, `rgba(251, 191, 36, ${0.8 * brightness})`);
+        glowGrad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 45, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Bulb Socket Base
+      ctx.fillStyle = '#64748b';
+      ctx.fillRect(cx - 8, cy + 12, 16, 12);
+
+      // Bulb Glass
+      ctx.beginPath();
+      ctx.arc(cx, cy, 16, 0, Math.PI * 2);
+      ctx.fillStyle = active ? `rgba(254, 240, 138, ${0.4 + 0.6 * brightness})` : 'rgba(51, 65, 85, 0.6)';
+      ctx.fill();
+      ctx.strokeStyle = active ? '#f59e0b' : '#475569';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Filament
+      ctx.strokeStyle = active ? '#ffffff' : '#94a3b8';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, cy + 10);
+      ctx.lineTo(cx - 2, cy - 2);
+      ctx.lineTo(cx + 2, cy - 2);
+      ctx.lineTo(cx + 6, cy + 10);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawElectronFlowAnimation(x1, y1, x2, y2, meterX, meterY, anodeIsLeft) {
+      ctx.save();
+
+      // Wire polyline points (Anode -> Meter -> Cathode)
+      let points = [];
+      if (anodeIsLeft) {
+        points = [
+          { x: x1, y: y1 },
+          { x: x1, y: meterY + 20 },
+          { x: x2, y: meterY + 20 },
+          { x: x2, y: y2 }
+        ];
+      } else {
+        points = [
+          { x: x2, y: y2 },
+          { x: x2, y: meterY + 20 },
+          { x: x1, y: meterY + 20 },
+          { x: x1, y: y1 }
+        ];
+      }
+
+      // Compute total path length
+      let totalDist = 0;
+      const segments = [];
+      for (let i = 0; i < points.length - 1; i++) {
+        const dx = points[i + 1].x - points[i].x;
+        const dy = points[i + 1].y - points[i].y;
+        const len = Math.hypot(dx, dy);
+        segments.push({ p1: points[i], p2: points[i + 1], len: len, accum: totalDist });
+        totalDist += len;
+      }
+
+      // Render electron particles along line
+      const numElectrons = 14;
+      const spacing = totalDist / numElectrons;
+
+      for (let i = 0; i < numElectrons; i++) {
+        let d = (state.electronOffset + i * spacing) % totalDist;
+        if (d < 0) d += totalDist;
+
+        // Find segment corresponding to distance d
+        const seg = segments.find(s => d >= s.accum && d <= s.accum + s.len) || segments[0];
+        const t = (d - seg.accum) / seg.len;
+        const px = seg.p1.x + t * (seg.p2.x - seg.p1.x);
+        const py = seg.p1.y + t * (seg.p2.y - seg.p1.y);
+
+        // Glowing Electron Dot
+        ctx.fillStyle = '#fef08a'; // Bright yellow
+        ctx.shadowColor = '#eab308';
+        ctx.shadowBlur = 6;
+        ctx.beginPath();
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Electron Flow Direction Arrow Label
+      const arrowX = meterX;
+      const arrowY = meterY + 36;
+      ctx.shadowBlur = 0;
+      ctx.font = '700 11px Inter';
+      ctx.fillStyle = '#facc15';
+      ctx.textAlign = 'center';
+      const dirText = anodeIsLeft ? 'e⁻ Flow Direction ➔' : '◄ e⁻ Flow Direction';
+      ctx.fillText(dirText, arrowX, arrowY);
+
+      ctx.restore();
+    }
+
+    function drawSaltBridgeIonsAnimation(xLeft, xRight, dipY, topY) {
+      ctx.save();
+
+      state.saltBridgeParticles.forEach(p => {
+        // Move cations towards cathode, anions towards anode
+        // If left is anode: Anions (NO3-) move Left, Cations (K+) move Right
+        const speed = 0.003;
+        if (state.anodeIsLeft) {
+          if (p.type === 'anion') p.progress -= speed; // Towards Left (0)
+          else p.progress += speed; // Towards Right (1)
+        } else {
+          if (p.type === 'anion') p.progress += speed; // Towards Right (1)
+          else p.progress -= speed; // Towards Left (0)
+        }
+
+        if (p.progress < 0) p.progress += 1;
+        if (p.progress > 1) p.progress -= 1;
+
+        // Interpolate along salt bridge U-shape
+        let px, py;
+        const prog = p.progress;
+        
+        // Segments: 0..0.3 (Up left arm), 0.3..0.7 (Across top), 0.7..1.0 (Down right arm)
+        if (prog < 0.3) {
+          const t = prog / 0.3;
+          px = xLeft + p.offsetY;
+          py = dipY - t * (dipY - topY);
+        } else if (prog < 0.7) {
+          const t = (prog - 0.3) / 0.4;
+          px = xLeft + t * (xRight - xLeft);
+          py = topY + p.offsetY;
+        } else {
+          const t = (prog - 0.7) / 0.3;
+          px = xRight + p.offsetY;
+          py = topY + t * (dipY - topY);
+        }
+
+        ctx.font = 'bold 9px JetBrains Mono';
+        ctx.textAlign = 'center';
+
+        if (p.type === 'cation') {
+          ctx.fillStyle = '#f87171'; // K+ Red
+          ctx.fillText('K⁺', px, py);
+        } else {
+          ctx.fillStyle = '#60a5fa'; // NO3- Blue
+          ctx.fillText('NO₃⁻', px, py);
+        }
+      });
+
+      ctx.restore();
+    }
+
+    function drawSolutionIons(bx, by, bw, bh, ionArray, metalKey, flowActive, isAnode) {
+      ctx.save();
+
+      const metal = METALS[metalKey];
+      const ionStr = `${metal.symbol}${metal.valence === 1 ? '⁺' : (metal.valence + '⁺')}`;
+
+      // Calculate speed scaling factor based on temperature (0°C = 0.2x, 25°C = 1.0x, 100°C = 3.0x)
+      const tempSpeedFactor = 0.2 + (state.temperatureC / 100) * 2.8;
+
+      ionArray.forEach(ion => {
+        if (flowActive) {
+          ion.x += ion.vx * tempSpeedFactor;
+          ion.y += ion.vy * tempSpeedFactor;
+
+          if (ion.x < 0.1 || ion.x > 0.9) ion.vx *= -1;
+          if (ion.y < 0.25 || ion.y > 0.85) ion.vy *= -1;
+        }
+
+        const px = bx + 15 + ion.x * (bw - 30);
+        const py = by + ion.y * (bh - 25);
+
+        ctx.font = '500 10px JetBrains Mono';
+        ctx.fillStyle = isAnode ? 'rgba(248, 113, 113, 0.85)' : 'rgba(52, 211, 153, 0.85)';
+        ctx.fillText(ionStr, px, py);
+      });
+
+      ctx.restore();
+    }
+
+    function drawMicroscopeCanvas() {
+      const w = microCanvas.width;
+      const h = microCanvas.height;
+
+      microCtx.clearRect(0, 0, w, h);
+
+      // Background
+      microCtx.fillStyle = '#020617';
+      microCtx.fillRect(0, 0, w, h);
+
+      const targetIsAnode = state.microTarget === 'anode';
+      const activeMetalKey = targetIsAnode ? state.anodeKey : state.cathodeKey;
+      const metal = METALS[activeMetalKey];
+
+      // Draw Solution Liquid on Top
+      microCtx.fillStyle = metal.liquidColor;
+      microCtx.fillRect(0, 0, w, 110);
+
+      microCtx.font = '600 10px Inter';
+      microCtx.fillStyle = '#94a3b8';
+      microCtx.fillText(`Solution: ${metal.symbol}${metal.valence}+ (aq)`, 10, 20);
+
+      // Draw Metal Lattice Atoms at Bottom
+      microCtx.fillStyle = '#334155';
+      microCtx.fillRect(0, 110, w, h - 110);
+
+      const flowActive = state.circuitConnected && state.saltBridgeActive && state.E_cell !== 0;
+
+      // Update & Draw Microscopic Atoms
+      state.microAtoms.forEach((atom, idx) => {
+        let drawX = atom.x;
+        let drawY = atom.y;
+
+        if (flowActive) {
+          if (targetIsAnode) {
+            // Anode oxidation: Surface atoms detach and move up into solution
+            if (idx < 8) {
+              atom.y -= 0.3;
+              if (atom.y < 50) atom.y = 120; // reset loop
+            }
+          } else {
+            // Cathode reduction: Aqueous ions move down and deposit on lattice
+            if (idx < 8) {
+              atom.y += 0.3;
+              if (atom.y > 120) atom.y = 50; // reset loop
+            }
+          }
+        }
+
+        // Draw Metal Atom Sphere
+        microCtx.beginPath();
+        microCtx.arc(drawX, drawY, 10, 0, Math.PI * 2);
+        
+        const grad = microCtx.createRadialGradient(drawX - 3, drawY - 3, 2, drawX, drawY, 10);
+        grad.addColorStop(0, metal.gradient[0]);
+        grad.addColorStop(1, metal.gradient[1]);
+        
+        microCtx.fillStyle = grad;
+        microCtx.fill();
+        microCtx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        microCtx.lineWidth = 1;
+        microCtx.stroke();
+
+        // Atom Label
+        microCtx.font = '700 8px JetBrains Mono';
+        microCtx.fillStyle = '#0f172a';
+        microCtx.textAlign = 'center';
+        microCtx.fillText(metal.symbol, drawX, drawY + 3);
+      });
+
+      // Animated electrons jumping at interface
+      if (flowActive) {
+        microCtx.fillStyle = '#fef08a';
+        const eX = (Date.now() / 10) % w;
+        const eY = targetIsAnode ? 105 : 115;
+        
+        microCtx.beginPath();
+        microCtx.arc(eX, eY, 3, 0, Math.PI * 2);
+        microCtx.fill();
+        
+        microCtx.font = '600 9px JetBrains Mono';
+        microCtx.fillStyle = '#facc15';
+        microCtx.fillText(targetIsAnode ? 'e⁻ ➔ Wire' : 'e⁻ ➔ Ion', w - 50, 30);
+      }
+    }
+  </script>
+</body>
+</html>
